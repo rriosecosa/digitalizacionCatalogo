@@ -1,35 +1,33 @@
-from django.shortcuts import render
-from django.core.paginator import Paginator
+from collections import OrderedDict
 
-from .models import (
-    Producto,
-    FamiliaProducto,
-)
+from django.core.paginator import Paginator
+from django.shortcuts import render
 
 from .agrupador import obtener_grupo
+from .models import FamiliaProducto, Producto
 
 
 def lista_productos(request):
 
-    # -----------------------------
-    # Filtro recibido desde la URL
-    # -----------------------------
+    # ==========================================
+    # Parámetros recibidos
+    # ==========================================
 
     familia_seleccionada = request.GET.get("familia", "")
-    texto_busqueda = request.GET.get("q", "").strip()
+    texto_busqueda = request.GET.get("q", "").strip().lower()
 
-    # -----------------------------
-    # Todas las familias
-    # -----------------------------
+    # ==========================================
+    # Familias
+    # ==========================================
 
     familias = {
         f.codigo: f
         for f in FamiliaProducto.objects.all()
     }
 
-    # -----------------------------
+    # ==========================================
     # Productos
-    # -----------------------------
+    # ==========================================
 
     productos = (
         Producto.objects
@@ -38,25 +36,28 @@ def lista_productos(request):
         .order_by("descripcion")
     )
 
-    # -----------------------------
-    # Agregar grupo y familia
-    # -----------------------------
+    # ==========================================
+    # Diccionario de grupos
+    # ==========================================
 
-    lista = []
+    grupos = OrderedDict()
 
     for p in productos:
 
-        # -----------------
+        # -------------------------
         # Grupo
-        # -----------------
+        # -------------------------
 
-        p.grupo = obtener_grupo(p.descripcion)
+        grupo = obtener_grupo(p.descripcion)
 
-        # -----------------
+        if not grupo:
+            grupo = p.descripcion
+
+        # -------------------------
         # Familia
-        # -----------------
+        # -------------------------
 
-        p.familia_obj = None
+        familia = None
 
         if p.codigo:
 
@@ -64,73 +65,115 @@ def lista_productos(request):
 
             if len(partes) >= 2:
 
-                codigo_familia = partes[1]
+                familia = familias.get(partes[1])
 
-                p.familia_obj = familias.get(codigo_familia)
-
-        # -----------------
+        # -------------------------
         # Filtro familia
-        # -----------------
+        # -------------------------
 
         if familia_seleccionada:
 
-            if (
-                p.familia_obj is None
-                or p.familia_obj.codigo != familia_seleccionada
-            ):
+            if familia is None:
                 continue
 
-        # -----------------
-        # Buscador
-        # -----------------
+            if familia.codigo != familia_seleccionada:
+                continue
+
+        # -------------------------
+        # Búsqueda
+        # -------------------------
 
         if texto_busqueda:
 
-            texto = texto_busqueda.lower()
+            texto = " ".join([
+                p.descripcion or "",
+                grupo or "",
+                p.codigo or "",
+                p.proveedor.marca if p.proveedor else "",
+            ]).lower()
 
-            encontrado = False
-
-            if p.descripcion and texto in p.descripcion.lower():
-                encontrado = True
-
-            elif p.codigo and texto in p.codigo.lower():
-                encontrado = True
-
-            elif (
-                p.proveedor
-                and p.proveedor.marca
-                and texto in p.proveedor.marca.lower()
-            ):
-                encontrado = True
-
-            if not encontrado:
+            if texto_busqueda not in texto:
                 continue
 
-        lista.append(p)
+        # -------------------------
+        # Crear grupo
+        # -------------------------
 
-    # -----------------------------
-    # Contar productos por familia
-    # -----------------------------
+        if grupo not in grupos:
 
-    conteo_familias = {}
+            grupos[grupo] = {
 
-    for p in lista:
+                "nombre": grupo,
 
-        if p.familia_obj:
+                "marca": (
+                    p.proveedor.marca
+                    if p.proveedor
+                    else ""
+                ),
 
-            codigo = p.familia_obj.codigo
+                "familia": familia,
 
-            conteo_familias[codigo] = (
-                conteo_familias.get(codigo, 0) + 1
-            )
+                "precio_desde": p.precio_base_pesos,
+
+                "productos": [],
+
+            }
+
+        # -------------------------
+        # Agregar variante
+        # -------------------------
+
+        grupos[grupo]["productos"].append(p)
+
+        # -------------------------
+        # Precio mínimo
+        # -------------------------
+
+        precio = p.precio_base_pesos
+
+        if precio is not None:
+
+            actual = grupos[grupo]["precio_desde"]
+
+            if actual is None or precio < actual:
+
+                grupos[grupo]["precio_desde"] = precio
+
+    # ==========================================
+    # Convertir a lista
+    # ==========================================
+
+    lista_grupos = list(grupos.values())
+
+    # ==========================================
+    # Contar variantes
+    # ==========================================
+
+    for g in lista_grupos:
+
+        g["cantidad"] = len(g["productos"])
+
+    # ==========================================
+    # Sidebar familias
+    # ==========================================
+
+    conteo = {}
+
+    for g in lista_grupos:
+
+        if g["familia"]:
+
+            codigo = g["familia"].codigo
+
+            conteo[codigo] = conteo.get(codigo, 0) + 1
 
     familias_sidebar = []
 
     for codigo, familia in familias.items():
 
-        if codigo in conteo_familias:
+        if codigo in conteo:
 
-            familia.total = conteo_familias[codigo]
+            familia.total = conteo[codigo]
 
             familias_sidebar.append(familia)
 
@@ -138,15 +181,19 @@ def lista_productos(request):
         key=lambda x: x.descripcion
     )
 
-    # -----------------------------
-    # PAGINACIÓN
-    # -----------------------------
+    # ==========================================
+    # Paginación
+    # ==========================================
 
-    paginator = Paginator(lista, 12)
+    paginator = Paginator(lista_grupos, 12)
 
-    page_number = request.GET.get("page")
+    page = request.GET.get("page")
 
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(page)
+
+    # ==========================================
+    # Render
+    # ==========================================
 
     return render(
 
@@ -156,9 +203,9 @@ def lista_productos(request):
 
         {
 
-            "page_obj": page_obj,
+            "grupos": page_obj,
 
-            "productos": page_obj,
+            "page_obj": page_obj,
 
             "familias": familias_sidebar,
 
