@@ -151,3 +151,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # --------------------------------------------------
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+#--------------------------------------------------------------------------
+# Redirigir al catálogo después de iniciar sesión con éxito
+LOGIN_REDIRECT_URL = '/'

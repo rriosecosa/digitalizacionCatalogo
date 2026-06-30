@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Catálogo</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-card {
+            background: #fff;
+            padding: 32px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 360px;
+        }
+        .login-card h2 {
+            margin-top: 0;
+            color: #1a3c6e;
+            font-size: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.88rem;
+            color: #6b7280;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e1e5eb;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 10px;
+            background: #1a3c6e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-login:hover {
+            background: #2b5694;
+        }
+        .error-msg {
+            color: #dc3545;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>Iniciar Sesión</h2>
+    
+    {% if form.errors %}
+        <p class="error-msg">Usuario o contraseña incorrectos.</p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="id_username">Usuario</label>
+            <input type="text" name="username" id="id_username" required>
+        </div>
+        <div class="form-group">
+            <label for="id_password">Contraseña</label>
+            <input type="password" name="password" id="id_password" required>
+        </div>
+        <button type="submit" class="btn-login">Ingresar</button>
+    </form>
+</div>
+
+</body>
+</html>
