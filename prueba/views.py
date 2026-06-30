@@ -14,6 +14,7 @@ def lista_productos(request):
     # ==========================================
 
     familia_seleccionada = request.GET.get("familia", "")
+    marca_seleccionada = request.GET.get("marca", "")
     texto_busqueda = request.GET.get("q", "").strip().lower()
 
     # ==========================================
@@ -68,6 +69,12 @@ def lista_productos(request):
                 familia = familias.get(partes[1])
 
         # -------------------------
+        # Marca
+        # -------------------------
+
+        marca = p.proveedor.marca if p.proveedor else ""
+
+        # -------------------------
         # Filtro familia
         # -------------------------
 
@@ -80,6 +87,18 @@ def lista_productos(request):
                 continue
 
         # -------------------------
+        # Filtro marca
+        # -------------------------
+
+        if marca_seleccionada:
+
+            if not marca:
+                continue
+
+            if marca.lower() != marca_seleccionada.lower():
+                continue
+
+        # -------------------------
         # Búsqueda
         # -------------------------
 
@@ -89,7 +108,7 @@ def lista_productos(request):
                 p.descripcion or "",
                 grupo or "",
                 p.codigo or "",
-                p.proveedor.marca if p.proveedor else "",
+                marca or "",
             ]).lower()
 
             if texto_busqueda not in texto:
@@ -105,11 +124,7 @@ def lista_productos(request):
 
                 "nombre": grupo,
 
-                "marca": (
-                    p.proveedor.marca
-                    if p.proveedor
-                    else ""
-                ),
+                "marca": marca,
 
                 "familia": familia,
 
@@ -157,7 +172,7 @@ def lista_productos(request):
     # Sidebar familias
     # ==========================================
 
-    conteo = {}
+    conteo_familias = {}
 
     for g in lista_grupos:
 
@@ -165,21 +180,40 @@ def lista_productos(request):
 
             codigo = g["familia"].codigo
 
-            conteo[codigo] = conteo.get(codigo, 0) + 1
+            conteo_familias[codigo] = conteo_familias.get(codigo, 0) + 1
 
     familias_sidebar = []
 
     for codigo, familia in familias.items():
 
-        if codigo in conteo:
+        if codigo in conteo_familias:
 
-            familia.total = conteo[codigo]
+            familia.total = conteo_familias[codigo]
 
             familias_sidebar.append(familia)
 
     familias_sidebar.sort(
         key=lambda x: x.descripcion
     )
+
+    # ==========================================
+    # Sidebar marcas
+    # ==========================================
+
+    conteo_marcas = {}
+
+    for g in lista_grupos:
+
+        if g["marca"]:
+
+            conteo_marcas[g["marca"]] = conteo_marcas.get(g["marca"], 0) + 1
+
+    marcas_sidebar = [
+        {"nombre": nombre, "total": total}
+        for nombre, total in conteo_marcas.items()
+    ]
+
+    marcas_sidebar.sort(key=lambda x: x["nombre"])
 
     # ==========================================
     # Paginación
@@ -209,7 +243,11 @@ def lista_productos(request):
 
             "familias": familias_sidebar,
 
+            "marcas": marcas_sidebar,
+
             "familia_actual": familia_seleccionada,
+
+            "marca_actual": marca_seleccionada,
 
             "busqueda": texto_busqueda,
 

@@ -66,19 +66,67 @@
         padding: 20px;
         position: sticky;
         top: 20px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
         box-shadow: var(--sombra);
     }
 
-    aside.sidebar h2 {
-        font-size: 1rem;
+    aside.sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    aside.sidebar::-webkit-scrollbar-thumb {
+        background: var(--color-borde);
+        border-radius: 999px;
+    }
+
+    .bloque-filtro {
+        border-bottom: 1px solid var(--color-borde);
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+    }
+
+    .bloque-filtro:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .bloque-filtro summary {
+        list-style: none;
+        cursor: pointer;
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-texto-suave);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2px 0;
+    }
+
+    .bloque-filtro summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .bloque-filtro summary::after {
+        content: "▾";
+        font-size: 0.75rem;
+        color: var(--color-texto-suave);
+        transition: transform 0.15s;
+    }
+
+    .bloque-filtro[open] summary::after {
+        transform: rotate(180deg);
+    }
+
+    .bloque-filtro h2 {
+        font-size: 0.82rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--color-texto-suave);
         margin: 0 0 14px;
-    }
-
-    .form-busqueda {
-        margin-bottom: 22px;
     }
 
     .form-busqueda input[type="text"] {
@@ -112,41 +160,52 @@
         background: var(--color-primario-claro);
     }
 
-    ul.lista-familias {
+    ul.lista-opciones {
         list-style: none;
-        margin: 0;
+        margin: 10px 0 0;
         padding: 0;
+        max-height: 230px;
+        overflow-y: auto;
     }
 
-    ul.lista-familias li {
-        margin-bottom: 4px;
+    ul.lista-opciones::-webkit-scrollbar {
+        width: 5px;
     }
 
-    ul.lista-familias a {
+    ul.lista-opciones::-webkit-scrollbar-thumb {
+        background: var(--color-borde);
+        border-radius: 999px;
+    }
+
+    ul.lista-opciones li {
+        margin-bottom: 3px;
+    }
+
+    ul.lista-opciones a {
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 8px;
-        padding: 8px 10px;
+        padding: 7px 10px;
         border-radius: 8px;
         text-decoration: none;
         color: var(--color-texto);
-        font-size: 0.92rem;
+        font-size: 0.88rem;
         transition: background 0.15s, color 0.15s;
     }
 
-    ul.lista-familias a:hover {
+    ul.lista-opciones a:hover {
         background: var(--color-fondo);
     }
 
-    ul.lista-familias a.activa {
+    ul.lista-opciones a.activa {
         background: var(--color-primario);
         color: #fff;
         font-weight: 600;
     }
 
-    ul.lista-familias .badge {
-        font-size: 0.75rem;
+    ul.lista-opciones .badge {
+        font-size: 0.72rem;
         background: var(--color-borde);
         color: var(--color-texto-suave);
         border-radius: 999px;
@@ -155,21 +214,34 @@
         text-align: center;
     }
 
-    ul.lista-familias a.activa .badge {
+    ul.lista-opciones a.activa .badge {
         background: rgba(255,255,255,0.25);
         color: #fff;
     }
 
-    a.limpiar-filtro {
+    .sin-opciones {
+        font-size: 0.82rem;
+        color: var(--color-texto-suave);
+        margin-top: 8px;
+    }
+
+    a.limpiar-filtro,
+    a.limpiar-todo {
         display: inline-block;
-        margin-top: 14px;
-        font-size: 0.85rem;
+        margin-top: 10px;
+        font-size: 0.83rem;
         color: var(--color-primario-claro);
         text-decoration: none;
     }
 
-    a.limpiar-filtro:hover {
+    a.limpiar-filtro:hover,
+    a.limpiar-todo:hover {
         text-decoration: underline;
+    }
+
+    a.limpiar-todo {
+        margin-top: 16px;
+        font-weight: 600;
     }
 
     /* ---------- Contenido principal ---------- */
@@ -196,7 +268,13 @@
         color: var(--color-texto);
     }
 
-    .chip-busqueda {
+    .chips-activos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .chip {
         display: inline-flex;
         align-items: center;
         gap: 6px;
@@ -208,7 +286,7 @@
         color: var(--color-texto-suave);
     }
 
-    .chip-busqueda a {
+    .chip a {
         color: var(--color-primario);
         text-decoration: none;
         font-weight: 600;
@@ -422,6 +500,11 @@
 
         aside.sidebar {
             position: static;
+            max-height: none;
+        }
+
+        ul.lista-opciones {
+            max-height: none;
         }
     }
 </style>
@@ -438,41 +521,71 @@
     <!-- ===================== SIDEBAR ===================== -->
     <aside class="sidebar">
 
-        <h2>Buscar</h2>
-        <form class="form-busqueda" method="get" action="">
+        <div class="bloque-filtro">
+            <h2>Buscar</h2>
+            <form class="form-busqueda" method="get" action="">
+                {% if familia_actual %}
+                    <input type="hidden" name="familia" value="{{ familia_actual }}">
+                {% endif %}
+                {% if marca_actual %}
+                    <input type="hidden" name="marca" value="{{ marca_actual }}">
+                {% endif %}
+                <input
+                    type="text"
+                    name="q"
+                    placeholder="Nombre, código o marca..."
+                    value="{{ busqueda }}"
+                >
+                <button type="submit">Buscar</button>
+            </form>
+        </div>
+
+        <details class="bloque-filtro" open>
+            <summary>Familias</summary>
+            <ul class="lista-opciones">
+                {% for familia in familias %}
+                    <li>
+                        <a
+                            href="?familia={{ familia.codigo }}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}"
+                            class="{% if familia_actual == familia.codigo %}activa{% endif %}"
+                        >
+                            <span>{{ familia.descripcion }}</span>
+                            <span class="badge">{{ familia.total }}</span>
+                        </a>
+                    </li>
+                {% empty %}
+                    <li class="sin-opciones">No hay familias disponibles.</li>
+                {% endfor %}
+            </ul>
             {% if familia_actual %}
-                <input type="hidden" name="familia" value="{{ familia_actual }}">
+                <a class="limpiar-filtro" href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de familia</a>
             {% endif %}
-            <input
-                type="text"
-                name="q"
-                placeholder="Nombre, código o marca..."
-                value="{{ busqueda }}"
-            >
-            <button type="submit">Buscar</button>
-        </form>
+        </details>
 
-        <h2>Familias</h2>
-        <ul class="lista-familias">
-            {% for familia in familias %}
-                <li>
-                    <a
-                        href="?familia={{ familia.codigo }}{% if busqueda %}&q={{ busqueda }}{% endif %}"
-                        class="{% if familia_actual == familia.codigo %}activa{% endif %}"
-                    >
-                        <span>{{ familia.descripcion }}</span>
-                        <span class="badge">{{ familia.total }}</span>
-                    </a>
-                </li>
-            {% empty %}
-                <li style="font-size:0.85rem; color:var(--color-texto-suave);">
-                    No hay familias disponibles.
-                </li>
-            {% endfor %}
-        </ul>
+        <details class="bloque-filtro" open>
+            <summary>Marcas</summary>
+            <ul class="lista-opciones">
+                {% for marca in marcas %}
+                    <li>
+                        <a
+                            href="?marca={{ marca.nombre }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}"
+                            class="{% if marca_actual == marca.nombre %}activa{% endif %}"
+                        >
+                            <span>{{ marca.nombre }}</span>
+                            <span class="badge">{{ marca.total }}</span>
+                        </a>
+                    </li>
+                {% empty %}
+                    <li class="sin-opciones">No hay marcas disponibles.</li>
+                {% endfor %}
+            </ul>
+            {% if marca_actual %}
+                <a class="limpiar-filtro" href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de marca</a>
+            {% endif %}
+        </details>
 
-        {% if familia_actual or busqueda %}
-            <a class="limpiar-filtro" href="?">Limpiar filtros</a>
+        {% if familia_actual or marca_actual or busqueda %}
+            <a class="limpiar-todo" href="?">✕ Limpiar todos los filtros</a>
         {% endif %}
 
     </aside>
@@ -488,12 +601,26 @@
                 {% endif %}
             </div>
 
-            {% if busqueda %}
-                <div class="chip-busqueda">
-                    Resultados para "{{ busqueda }}"
-                    <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}">✕</a>
-                </div>
-            {% endif %}
+            <div class="chips-activos">
+                {% if busqueda %}
+                    <div class="chip">
+                        "{{ busqueda }}"
+                        <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}">✕</a>
+                    </div>
+                {% endif %}
+                {% if marca_actual %}
+                    <div class="chip">
+                        Marca: {{ marca_actual }}
+                        <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
+                    </div>
+                {% endif %}
+                {% if familia_actual %}
+                    <div class="chip">
+                        Familia: {{ familia_actual }}
+                        <a href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
+                    </div>
+                {% endif %}
+            </div>
         </div>
 
         {% if grupos %}
@@ -563,7 +690,7 @@
         {% else %}
             <div class="estado-vacio">
                 <h3>No se encontraron productos</h3>
-                <p>Prueba ajustando la búsqueda o quitando el filtro de familia.</p>
+                <p>Prueba ajustando la búsqueda o quitando los filtros aplicados.</p>
             </div>
         {% endif %}
 
@@ -572,21 +699,21 @@
             <nav class="paginacion">
 
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹</a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹</a>
                 {% endif %}
 
                 {% for numero in page_obj.paginator.page_range %}
                     {% if numero == page_obj.number %}
                         <span class="actual">{{ numero }}</span>
                     {% elif numero == 1 or numero == page_obj.paginator.num_pages or numero|add:"-1" == page_obj.number or numero|add:"1" == page_obj.number %}
-                        <a href="?page={{ numero }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ numero }}</a>
+                        <a href="?page={{ numero }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ numero }}</a>
                     {% elif numero == 2 or numero == page_obj.paginator.num_pages|add:"-1" %}
                         <span class="puntos">…</span>
                     {% endif %}
                 {% endfor %}
 
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">›</a>
+                    <a href="?page={{ page_obj.next_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">›</a>
                 {% endif %}
 
             </nav>
