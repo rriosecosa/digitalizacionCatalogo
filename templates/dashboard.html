@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gestión de Catálogo</title>
+    <style>
+        :root {
+            --color-primario: #1a3c6e;
+            --color-primario-claro: #2b5694;
+            --color-fondo: #f4f6f9;
+            --color-borde: #e1e5eb;
+            --color-texto: #222;
+            --color-exito: #28a745;
+        }
+        body {
+            font-family: "Segoe UI", Roboto, sans-serif;
+            background: var(--color-fondo);
+            margin: 0;
+            padding: 20px;
+            color: var(--color-texto);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .header-dash {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--color-borde);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .header-dash h1 { margin: 0; color: var(--color-primario); font-size: 1.6rem; }
+        .btn-logout {
+            padding: 8px 14px;
+            background: #dc3545;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .barra-herramientas {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+        .form-busqueda input {
+            padding: 8px 12px;
+            border: 1px solid var(--color-borde);
+            border-radius: 6px;
+            width: 250px;
+        }
+        .form-busqueda button {
+            padding: 8px 12px;
+            background: var(--color-primario);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .alert {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-borde);
+        }
+        th { background: #f8f9fa; color: var(--color-primario); font-weight: 600; }
+        .input-edit {
+            width: 90px;
+            padding: 6px;
+            border: 1px solid var(--color-borde);
+            border-radius: 4px;
+        }
+        .btn-guardar {
+            padding: 6px 12px;
+            background: var(--color-exito);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-guardar:hover { background: #218838; }
+        .paginacion {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 20px;
+        }
+        .paginacion a, .paginacion span {
+            padding: 6px 12px;
+            border: 1px solid var(--color-borde);
+            background: white;
+            text-decoration: none;
+            color: var(--color-texto);
+            border-radius: 4px;
+        }
+        .paginacion .active { background: var(--color-primario); color: white; border-color: var(--color-primario); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-dash">
+        <h1>Panel de Control: Edición de Productos</h1>
+        <div>
+            <a href="{% url 'productos' %}" style="margin-right: 15px; color: var(--color-primario-claro); text-decoration: none; font-weight:600;">Ver Catálogo</a>
+            <a href="{% url 'logout' %}" class="btn-logout">Cerrar Sesión</a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="barra-herramientas">
+        <form class="form-busqueda" method="get" action="">
+            <input type="text" name="q" placeholder="Buscar por descripción o código..." value="{{ busqueda }}">
+            <button type="submit">Filtrar</button>
+        </form>
+        <span style="font-size: 0.9rem; color: #6b7280;">Usuario: <strong>{{ request.user.username }}</strong></span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Marca</th>
+                <th>Precio Base ($)</th>
+                <th>Stock</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prod in productos %}
+            <tr>
+                <form method="post" action="{% url 'editar_producto' prod.field_id %}">
+                    {% csrf_token %}
+                    <td><span style="font-family: monospace; background: #eee; padding: 2px 4px; border-radius:4px;">{{ prod.codigo|default:"---" }}</span></td>
+                    <td>{{ prod.descripcion }}</td>
+                    <td>{{ prod.proveedor.marca|default:"---" }}</td>
+                    <td>
+                        <input type="number" step="any" name="precio_base_pesos" class="input-edit" value="{{ prod.precio_base_pesos|default:'' }}">
+                    </td>
+                    <td>
+                        <input type="number" step="any" name="stock_disponible" class="input-edit" value="{{ prod.stock_disponible|default:'' }}">
+                    </td>
+                    <td>
+                        <button type="submit" class="btn-guardar">Guardar</button>
+                    </td>
+                </form>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: #6b7280; padding: 20px;">No se encontraron productos para modificar.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="paginacion">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">«</a>
+        {% endif %}
+        
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+                <span class="active">{{ num }}</span>
+            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <a href="?page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">»</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+</body>
+</html>

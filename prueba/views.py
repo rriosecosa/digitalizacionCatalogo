@@ -292,3 +292,68 @@ def detalle_producto(request, producto_id):
             "variantes": variantes,
         },
     )
+
+# ... Mantén todas tus vistas anteriores idénticas (lista_productos y detalle_producto) ...
+
+from django.contrib.auth.decorators import permission_required
+from django.contrib import messages
+from django.shortcuts import redirect
+
+# ==========================================
+# VISTA: PANEL DASHBOARD PRINCIPAL
+# ==========================================
+@permission_required('prueba.change_producto', login_url='login')
+def dashboard_productos(request):
+    texto_busqueda = request.GET.get("q", "").strip().lower()
+    
+    # Traemos todos los productos ordenados por descripción
+    productos_qs = Producto.objects.select_related("proveedor").exclude(descripcion__startswith="***").order_by("descripcion")
+    
+    if texto_busqueda:
+        # Filtrado simple para facilitar la búsqueda en la tabla de edición
+        productos_qs = [
+            p for p in productos_qs 
+            if texto_busqueda in (p.descripcion or "").lower() or 
+               texto_busqueda in (p.codigo or "").lower() or
+               texto_busqueda in (p.proveedor.marca if p.proveedor else "").lower()
+        ]
+
+    # Paginación del dashboard (Mostramos de a 20 productos para agilizar)
+    paginator = Paginator(productos_qs, 20)
+    page = request.GET.get("page")
+    page_obj = paginator.get_page(page)
+
+    return render(
+        request,
+        "dashboard.html",
+        {
+            "productos": page_obj,
+            "page_obj": page_obj,
+            "busqueda": texto_busqueda,
+        }
+    )
+
+# ==========================================
+# VISTA: ACCIÓN EDITAR PRODUCTO (POST)
+# ==========================================
+@permission_required('prueba.change_producto', login_url='login')
+def editar_producto(request, producto_id):
+    if request.method == "POST":
+        # Usamos filter().update() debido a que tu modelo tiene 'managed = False' 
+        # y no posee clave primaria autoincremental convencional en algunas configuraciones antiguas
+        precio = request.POST.get("precio_base_pesos")
+        stock = request.POST.get("stock_disponible")
+        
+        try:
+            precio_float = float(precio) if precio else None
+            stock_float = float(stock) if stock else None
+            
+            Producto.objects.filter(field_id=producto_id).update(
+                precio_base_pesos=precio_float,
+                stock_disponible=stock_float
+            )
+            messages.success(request, "Producto actualizado correctamente.")
+        except ValueError:
+            messages.error(request, "Error: Los valores ingresados no son numéricos válidos.")
+            
+    return redirect('dashboard')
