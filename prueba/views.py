@@ -1,61 +1,18 @@
 from collections import OrderedDict
 
 from django.core.paginator import Paginator
-<<<<<<< HEAD
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
-=======
 from django.shortcuts import render, get_object_or_404
->>>>>>> 95ce4b687888cda4e91b5625a91d7a1de38a298e
 
 from .agrupador import obtener_grupo
 from .models import FamiliaProducto, Producto
 
 
-# ==========================================
-# Logica de Autenticación: Login
-# ==========================================
-def login_view(request):
-    if request.user.is_authenticated:
-        return redirect('vista_previa_catalogo')
-        
-    if request.method == 'POST':
-        usuario = request.POST.get('username')
-        clave = request.POST.get('password')
-        
-        user = authenticate(request, username=usuario, password=clave)
-        
-        if user is not None:
-            # RESTRICCIÓN: No permitir superusuarios en este catálogo personalizado
-            if user.is_superuser:
-                messages.error(request, "Los superusuarios deben usar el panel de administración.")
-                return render(request, 'login.html')
-                
-            login(request, user)
-            return redirect('vista_previa_catalogo')
-        else:
-            messages.error(request, "Usuario o contraseña incorrectos.")
-            
-    return render(request, 'login.html')
-
-
-# ==========================================
-# Logica de Autenticación: Logout
-# ==========================================
-def logout_view(request):
-    logout(request)
-    return redirect('login')
-
-
-# ==========================================
-# Catálogo (PÚBLICO - Sin decorador)
-# ==========================================
 def lista_productos(request):
 
     # ==========================================
     # Parámetros recibidos
     # ==========================================
+
     familia_seleccionada = request.GET.get("familia", "")
     marca_seleccionada = request.GET.get("marca", "")
     texto_busqueda = request.GET.get("q", "").strip().lower()
@@ -63,6 +20,7 @@ def lista_productos(request):
     # ==========================================
     # Familias
     # ==========================================
+
     familias = {
         f.codigo: f
         for f in FamiliaProducto.objects.all()
@@ -71,6 +29,7 @@ def lista_productos(request):
     # ==========================================
     # Productos
     # ==========================================
+
     productos = (
         Producto.objects
         .select_related("proveedor")
@@ -81,37 +40,70 @@ def lista_productos(request):
     # ==========================================
     # Diccionario de grupos
     # ==========================================
+
     grupos = OrderedDict()
 
     for p in productos:
+
+        # -------------------------
+        # Grupo
+        # -------------------------
+
         grupo = obtener_grupo(p.descripcion)
 
         if not grupo:
             grupo = p.descripcion
 
+        # -------------------------
+        # Familia
+        # -------------------------
+
         familia = None
+
         if p.codigo:
+
             partes = p.codigo.split("-")
+
             if len(partes) >= 2:
+
                 familia = familias.get(partes[1])
+
+        # -------------------------
+        # Marca
+        # -------------------------
 
         marca = p.proveedor.marca if p.proveedor else ""
 
+        # -------------------------
         # Filtro familia
+        # -------------------------
+
         if familia_seleccionada:
+
             if familia is None:
                 continue
+
             if familia.codigo != familia_seleccionada:
                 continue
 
+        # -------------------------
         # Filtro marca
+        # -------------------------
+
         if marca_seleccionada:
-            if not marca: continue
+
+            if not marca:
+                continue
+
             if marca.lower() != marca_seleccionada.lower():
                 continue
 
+        # -------------------------
         # Búsqueda
+        # -------------------------
+
         if texto_busqueda:
+
             texto = " ".join([
                 p.descripcion or "",
                 grupo or "",
@@ -122,84 +114,145 @@ def lista_productos(request):
             if texto_busqueda not in texto:
                 continue
 
+        # -------------------------
         # Crear grupo
+        # -------------------------
+
         if grupo not in grupos:
+
             grupos[grupo] = {
-<<<<<<< HEAD
-=======
                 "id_referencia": p.field_id, # <-- GUARDAMOS EL ID PARA LA URL DEL DETALLE
 
->>>>>>> 95ce4b687888cda4e91b5625a91d7a1de38a298e
                 "nombre": grupo,
+
                 "marca": marca,
+
                 "familia": familia,
+
                 "precio_desde": p.precio_base_pesos,
+
                 "productos": [],
+
             }
 
+        # -------------------------
         # Agregar variante
+        # -------------------------
+
         grupos[grupo]["productos"].append(p)
 
+        # -------------------------
         # Precio mínimo
+        # -------------------------
+
         precio = p.precio_base_pesos
+
         if precio is not None:
+
             actual = grupos[grupo]["precio_desde"]
+
             if actual is None or precio < actual:
+
                 grupos[grupo]["precio_desde"] = precio
 
+    # ==========================================
     # Convertir a lista
+    # ==========================================
+
     lista_grupos = list(grupos.values())
 
+    # ==========================================
     # Contar variantes
+    # ==========================================
+
     for g in lista_grupos:
+
         g["cantidad"] = len(g["productos"])
 
+    # ==========================================
     # Sidebar familias
+    # ==========================================
+
     conteo_familias = {}
+
     for g in lista_grupos:
+
         if g["familia"]:
+
             codigo = g["familia"].codigo
+
             conteo_familias[codigo] = conteo_familias.get(codigo, 0) + 1
 
     familias_sidebar = []
+
     for codigo, familia in familias.items():
+
         if codigo in conteo_familias:
+
             familia.total = conteo_familias[codigo]
+
             familias_sidebar.append(familia)
 
-    familias_sidebar.sort(key=lambda x: x.descripcion)
+    familias_sidebar.sort(
+        key=lambda x: x.descripcion
+    )
 
+    # ==========================================
     # Sidebar marcas
+    # ==========================================
+
     conteo_marcas = {}
+
     for g in lista_grupos:
+
         if g["marca"]:
+
             conteo_marcas[g["marca"]] = conteo_marcas.get(g["marca"], 0) + 1
 
     marcas_sidebar = [
         {"nombre": nombre, "total": total}
         for nombre, total in conteo_marcas.items()
     ]
+
     marcas_sidebar.sort(key=lambda x: x["nombre"])
 
+    # ==========================================
     # Paginación
+    # ==========================================
+
     paginator = Paginator(lista_grupos, 12)
+
     page = request.GET.get("page")
+
     page_obj = paginator.get_page(page)
 
+    # ==========================================
     # Render
+    # ==========================================
+
     return render(
-        request, "productos.html",
+
+        request,
+
+        "productos.html",
+
         {
+
             "grupos": page_obj,
+
             "page_obj": page_obj,
+
             "familias": familias_sidebar,
+
             "marcas": marcas_sidebar,
+
             "familia_actual": familia_seleccionada,
+
             "marca_actual": marca_seleccionada,
+
             "busqueda": texto_busqueda,
+
         },
-<<<<<<< HEAD
-=======
 
     )
 
@@ -238,5 +291,4 @@ def detalle_producto(request, producto_id):
             "producto_base": producto_base,
             "variantes": variantes,
         },
->>>>>>> 95ce4b687888cda4e91b5625a91d7a1de38a298e
     )
