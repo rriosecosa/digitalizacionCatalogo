@@ -394,42 +394,26 @@
         color: var(--color-texto-suave);
     }
 
-    .tarjeta details.variantes summary {
-        cursor: pointer;
-        font-size: 0.8rem;
+    /* NUEVO ESTILO ENLACE VER VARIANTES */
+    .btn-ver-detalle {
+        display: block;
+        text-align: center;
+        background: var(--color-fondo);
         color: var(--color-primario-claro);
+        border: 1px solid var(--color-borde);
+        padding: 7px 12px;
+        font-size: 0.8rem;
         font-weight: 600;
-        list-style: none;
+        border-radius: 6px;
+        text-decoration: none;
+        margin-top: 4px;
+        transition: all 0.15s ease;
     }
 
-    .tarjeta details.variantes summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .tarjeta details.variantes ul {
-        margin: 8px 0 0;
-        padding: 0;
-        list-style: none;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        max-height: 140px;
-        overflow-y: auto;
-    }
-
-    .tarjeta details.variantes li {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        font-size: 0.78rem;
-        color: var(--color-texto);
-        border-bottom: 1px solid var(--color-fondo);
-        padding-bottom: 3px;
-    }
-
-    .tarjeta details.variantes li .codigo {
-        color: var(--color-texto-suave);
-        font-family: monospace;
+    .btn-ver-detalle:hover {
+        background: var(--color-primario);
+        color: #fff;
+        border-color: var(--color-primario);
     }
 
     /* ---------- Vacío ---------- */
@@ -518,7 +502,6 @@
 
 <div class="layout">
 
-    <!-- ===================== SIDEBAR ===================== -->
     <aside class="sidebar">
 
         <div class="bloque-filtro">
@@ -590,7 +573,6 @@
 
     </aside>
 
-    <!-- ===================== CONTENIDO ===================== -->
     <main class="contenido">
 
         <div class="barra-resultados">
@@ -648,23 +630,9 @@
                             {% endif %}
 
                             {% if grupo.cantidad > 1 %}
-                                <details class="variantes">
-                                    <summary>Ver {{ grupo.cantidad }} variantes</summary>
-                                    <ul>
-                                        {% for producto in grupo.productos %}
-                                            <li>
-                                                <span class="codigo">{{ producto.codigo }}</span>
-                                                <span>
-                                                    {% if producto.precio_base_pesos %}
-                                                        ${{ producto.precio_base_pesos|floatformat:0 }}
-                                                    {% else %}
-                                                        Consultar
-                                                    {% endif %}
-                                                </span>
-                                            </li>
-                                        {% endfor %}
-                                    </ul>
-                                </details>
+                                <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle">
+                                    Ver {{ grupo.cantidad }} variantes
+                                </a>
                             {% endif %}
 
                             <div class="footer-tarjeta">
@@ -694,7 +662,6 @@
             </div>
         {% endif %}
 
-        <!-- ===================== PAGINACIÓN ===================== -->
         {% if page_obj.paginator.num_pages > 1 %}
             <nav class="paginacion">
 

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from django.core.paginator import Paginator
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 from .agrupador import obtener_grupo
 from .models import FamiliaProducto, Producto
@@ -121,6 +121,7 @@ def lista_productos(request):
         if grupo not in grupos:
 
             grupos[grupo] = {
+                "id_referencia": p.field_id, # <-- GUARDAMOS EL ID PARA LA URL DEL DETALLE
 
                 "nombre": grupo,
 
@@ -253,4 +254,41 @@ def lista_productos(request):
 
         },
 
+    )
+
+
+# ==========================================
+# NUEVA VISTA: VISTA DETALLE INDEPENDIENTE
+# ==========================================
+def detalle_producto(request, producto_id):
+    # Conseguimos el producto de ancla para el detalle
+    producto_base = get_object_or_404(Producto.objects.select_related("proveedor"), field_id=producto_id)
+    
+    # Identificamos su grupo raíz con tu función nativa
+    nombre_grupo = obtener_grupo(producto_base.descripcion)
+    if not nombre_grupo:
+        nombre_grupo = producto_base.descripcion
+        
+    marca_grupo = producto_base.proveedor.marca if producto_base.proveedor else ""
+
+    # Buscamos en el total de productos sólo las variantes que caigan en este mismo grupo
+    todos_los_productos = Producto.objects.select_related("proveedor").exclude(descripcion__startswith="***")
+    
+    variantes = []
+    for p in todos_los_productos:
+        g = obtener_grupo(p.descripcion) or p.descripcion
+        m = p.proveedor.marca if p.proveedor else ""
+        
+        if g == nombre_grupo and m == marca_grupo:
+            variantes.append(p)
+
+    return render(
+        request,
+        "detalle.html",
+        {
+            "nombre_grupo": nombre_grupo,
+            "marca": marca_grupo,
+            "producto_base": producto_base,
+            "variantes": variantes,
+        },
     )
