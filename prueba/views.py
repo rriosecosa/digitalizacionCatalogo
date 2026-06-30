@@ -1,9 +1,13 @@
 from collections import OrderedDict
 
 from django.core.paginator import Paginator
+<<<<<<< HEAD
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
+=======
+from django.shortcuts import render, get_object_or_404
+>>>>>>> 95ce4b687888cda4e91b5625a91d7a1de38a298e
 
 from .agrupador import obtener_grupo
 from .models import FamiliaProducto, Producto
@@ -121,6 +125,11 @@ def lista_productos(request):
         # Crear grupo
         if grupo not in grupos:
             grupos[grupo] = {
+<<<<<<< HEAD
+=======
+                "id_referencia": p.field_id, # <-- GUARDAMOS EL ID PARA LA URL DEL DETALLE
+
+>>>>>>> 95ce4b687888cda4e91b5625a91d7a1de38a298e
                 "nombre": grupo,
                 "marca": marca,
                 "familia": familia,
@@ -189,4 +198,45 @@ def lista_productos(request):
             "marca_actual": marca_seleccionada,
             "busqueda": texto_busqueda,
         },
+<<<<<<< HEAD
+=======
+
+    )
+
+
+# ==========================================
+# NUEVA VISTA: VISTA DETALLE INDEPENDIENTE
+# ==========================================
+def detalle_producto(request, producto_id):
+    # Conseguimos el producto de ancla para el detalle
+    producto_base = get_object_or_404(Producto.objects.select_related("proveedor"), field_id=producto_id)
+    
+    # Identificamos su grupo raíz con tu función nativa
+    nombre_grupo = obtener_grupo(producto_base.descripcion)
+    if not nombre_grupo:
+        nombre_grupo = producto_base.descripcion
+        
+    marca_grupo = producto_base.proveedor.marca if producto_base.proveedor else ""
+
+    # Buscamos en el total de productos sólo las variantes que caigan en este mismo grupo
+    todos_los_productos = Producto.objects.select_related("proveedor").exclude(descripcion__startswith="***")
+    
+    variantes = []
+    for p in todos_los_productos:
+        g = obtener_grupo(p.descripcion) or p.descripcion
+        m = p.proveedor.marca if p.proveedor else ""
+        
+        if g == nombre_grupo and m == marca_grupo:
+            variantes.append(p)
+
+    return render(
+        request,
+        "detalle.html",
+        {
+            "nombre_grupo": nombre_grupo,
+            "marca": marca_grupo,
+            "producto_base": producto_base,
+            "variantes": variantes,
+        },
+>>>>>>> 95ce4b687888cda4e91b5625a91d7a1de38a298e
     )
