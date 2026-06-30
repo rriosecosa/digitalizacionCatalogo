@@ -1,6 +1,11 @@
 from django.urls import path
-from .views import lista_productos
+from . import views # Importa el archivo views.py de tu app 'prueba'
 
 urlpatterns = [
-    path('', lista_productos, name='productos'),
+    # Si mantuviste el nombre original 'lista_productos' en tu views.py:
+    path('', views.lista_productos, name='productos'),
+    
+ 
+    path('login/', views.login_view, name='login'),
+      path('logout/', views.logout_view, name='logout'),
 ]

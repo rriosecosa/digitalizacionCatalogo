@@ -1,240 +1,193 @@
 <!doctype html>
 <html lang="es">
+  <head>
+    <meta charset="UTF-8" />
 
-<head>
+    <title>Catálogo</title>
 
-<meta charset="UTF-8">
+    <style>
+      body {
+        font-family: Arial;
+        background: #f3f3f3;
+        margin: 30px;
+      }
 
-<title>Catálogo</title>
+      .grid {
+        display: grid;
 
-<style>
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 
-body{
+        gap: 25px;
+      }
 
-    font-family:Arial;
-    background:#f3f3f3;
-    margin:30px;
+      .card {
+        background: white;
 
-}
+        border-radius: 10px;
 
-.grid{
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
 
-    display:grid;
+        padding: 20px;
+      }
 
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+      .foto {
+        height: 180px;
 
-    gap:25px;
+        background: #efefef;
 
-}
+        display: flex;
 
-.card{
+        justify-content: center;
 
-    background:white;
+        align-items: center;
 
-    border-radius:10px;
+        margin-bottom: 15px;
 
-    box-shadow:0 0 10px rgba(0,0,0,.15);
+        font-size: 18px;
+      }
 
-    padding:20px;
+      .nombre {
+        font-size: 20px;
 
-}
+        font-weight: bold;
+      }
 
-.foto{
+      .marca {
+        color: #666;
 
-    height:180px;
+        margin-top: 5px;
+      }
 
-    background:#efefef;
+      .familia {
+        color: #999;
 
-    display:flex;
+        margin-top: 5px;
 
-    justify-content:center;
+        font-size: 14px;
+      }
 
-    align-items:center;
+      .precio {
+        font-size: 22px;
 
-    margin-bottom:15px;
+        color: #1b7f2c;
 
-    font-size:18px;
+        margin-top: 15px;
 
-}
+        font-weight: bold;
+      }
 
-.nombre{
+      .stock {
+        color: #555;
+      }
 
-    font-size:20px;
+      .variantes {
+        margin-top: 20px;
+      }
 
-    font-weight:bold;
+      .badge {
+        display: inline-block;
 
-}
+        background: #ddd;
 
-.marca{
+        padding: 6px 10px;
 
-    color:#666;
+        border-radius: 15px;
 
-    margin-top:5px;
+        margin: 3px;
 
-}
+        font-size: 13px;
+      }
 
-.familia{
+      button {
+        margin-top: 20px;
 
-    color:#999;
+        width: 100%;
 
-    margin-top:5px;
+        padding: 10px;
 
-    font-size:14px;
+        border: none;
 
-}
+        background: #0d6efd;
 
-.precio{
+        color: white;
 
-    font-size:22px;
+        border-radius: 5px;
 
-    color:#1b7f2c;
+        cursor: pointer;
+      }
 
-    margin-top:15px;
+      .navbar {
+        background: #fff;
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        margin: -30px -30px 30px -30px; /* Rompe el margen del body */
+      }
 
-    font-weight:bold;
+      .btn-nav,
+      .btn-logout {
+        text-decoration: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-size: 14px;
+        margin-left: 10px;
+        font-weight: bold;
+      }
+      .btn-nav {
+        background: #0d6efd;
+        color: white;
+      }
+      .btn-logout {
+        background: #dc3545;
+        color: white;
+      }
+    </style>
+  </head>
 
-}
+  <body>
+    <h1>Catálogo</h1>
 
-.stock{
+    <p>
+      Productos agrupados:
+      <strong>{{ grupos|length }}</strong>
+    </p>
 
-    color:#555;
+    <div class="grid">
+      {% for g in grupos %}
 
-}
+      <div class="card">
+        <div class="foto">SIN FOTO</div>
 
-.variantes{
+        <div class="nombre">{{ g.nombre }}</div>
 
-    margin-top:20px;
+        <div class="marca">
+          {% if g.proveedor %} {{ g.proveedor.marca }} {% endif %}
+        </div>
 
-}
+        <div class="familia">
+          {% if g.familia %} {{ g.familia.descripcion }} {% endif %}
+        </div>
 
-.badge{
+        <div class="precio">${{ g.producto_principal.precio_base_pesos }}</div>
 
-    display:inline-block;
+        <div class="stock">
+          Stock: {{ g.producto_principal.stock_disponible }}
+        </div>
 
-    background:#ddd;
+        <div class="variantes">
+          {% for v in g.variantes %}
 
-    padding:6px 10px;
+          <span class="badge"> {{ v.variante }} </span>
 
-    border-radius:15px;
+          {% endfor %}
+        </div>
 
-    margin:3px;
+        <button>Ver producto</button>
+      </div>
 
-    font-size:13px;
-
-}
-
-button{
-
-    margin-top:20px;
-
-    width:100%;
-
-    padding:10px;
-
-    border:none;
-
-    background:#0d6efd;
-
-    color:white;
-
-    border-radius:5px;
-
-    cursor:pointer;
-
-}
-
-</style>
-
-</head>
-
-<body>
-
-<h1>Catálogo</h1>
-
-<p>
-
-Productos agrupados:
-<strong>{{ grupos|length }}</strong>
-
-</p>
-
-<div class="grid">
-
-{% for g in grupos %}
-
-<div class="card">
-
-<div class="foto">
-
-SIN FOTO
-
-</div>
-
-<div class="nombre">
-
-{{ g.nombre }}
-
-</div>
-
-<div class="marca">
-
-{% if g.proveedor %}
-
-{{ g.proveedor.marca }}
-
-{% endif %}
-
-</div>
-
-<div class="familia">
-
-{% if g.familia %}
-
-{{ g.familia.descripcion }}
-
-{% endif %}
-
-</div>
-
-<div class="precio">
-
-${{ g.producto_principal.precio_base_pesos }}
-
-</div>
-
-<div class="stock">
-
-Stock:
-{{ g.producto_principal.stock_disponible }}
-
-</div>
-
-<div class="variantes">
-
-{% for v in g.variantes %}
-
-<span class="badge">
-
-{{ v.variante }}
-
-</span>
-
-{% endfor %}
-
-</div>
-
-<button>
-
-Ver producto
-
-</button>
-
-</div>
-
-{% endfor %}
-
-</div>
-
-</body>
-
+      {% endfor %}
+    </div>
+  </body>
 </html>
