@@ -1,11 +1,14 @@
 from collections import OrderedDict
+from datetime import datetime, timedelta  # <-- REQUERIDO PARA LOS KPIS
 
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout  # <-- REQUERIDO PARA LOGOUT
+from django.contrib.auth.decorators import permission_required
 from django.core.paginator import Paginator
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 
 from .agrupador import obtener_grupo
 from .models import FamiliaProducto, Producto
-
 
 def lista_productos(request):
 
@@ -293,7 +296,6 @@ def detalle_producto(request, producto_id):
         },
     )
 
-# ... Mantén todas tus vistas anteriores idénticas (lista_productos y detalle_producto) ...
 
 from django.contrib.auth.decorators import permission_required
 from django.contrib import messages
@@ -306,11 +308,24 @@ from django.shortcuts import redirect
 def dashboard_productos(request):
     texto_busqueda = request.GET.get("q", "").strip().lower()
     
-    # Traemos todos los productos ordenados por descripción
-    productos_qs = Producto.objects.select_related("proveedor").exclude(descripcion__startswith="***").order_by("descripcion")
+    # 1. Consulta base de datos limpia (Sin alterar)
+    productos_base_qs = Producto.objects.exclude(descripcion__startswith="***")
+    
+    # 2. --- CÁLCULO DE KPIS REALES ---
+    kpi_productos_activos = productos_base_qs.count()
+    kpi_familias_activas = FamiliaProducto.objects.count()
+    kpi_proveedores = productos_base_qs.values("proveedor__marca").distinct().exclude(proveedor__marca="").count()
+
+    # Validación de fecha para productos de los últimos 6 meses
+    hace_seis_meses = datetime.now() - timedelta(days=180)
+    kpi_nuevos_6_meses = productos_base_qs.filter(fecha_creacion__gte=hace_seis_meses).count() if hasattr(Producto, 'fecha_creacion') else 0
+    # ----------------------------------
+
+    # 3. Traemos el listado ordenado para la visualización de la tabla del administrador
+    productos_qs = productos_base_qs.select_related("proveedor").order_by("descripcion")
     
     if texto_busqueda:
-        # Filtrado simple para facilitar la búsqueda en la tabla de edición
+        # Mantenemos tu filtro original exacto en memoria
         productos_qs = [
             p for p in productos_qs 
             if texto_busqueda in (p.descripcion or "").lower() or 
@@ -318,7 +333,7 @@ def dashboard_productos(request):
                texto_busqueda in (p.proveedor.marca if p.proveedor else "").lower()
         ]
 
-    # Paginación del dashboard (Mostramos de a 20 productos para agilizar)
+    # Paginación interna del Dashboard
     paginator = Paginator(productos_qs, 20)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
@@ -330,17 +345,19 @@ def dashboard_productos(request):
             "productos": page_obj,
             "page_obj": page_obj,
             "busqueda": texto_busqueda,
+            # Variables requeridas por el diseño de tu dashboard.html
+            "kpi_productos_activos": kpi_productos_activos,
+            "kpi_familias_activas": kpi_familias_activas,
+            "kpi_proveedores": kpi_proveedores,
+            "kpi_nuevos_6_meses": kpi_nuevos_6_meses,
         }
     )
-
 # ==========================================
 # VISTA: ACCIÓN EDITAR PRODUCTO (POST)
 # ==========================================
 @permission_required('prueba.change_producto', login_url='login')
 def editar_producto(request, producto_id):
     if request.method == "POST":
-        # Usamos filter().update() debido a que tu modelo tiene 'managed = False' 
-        # y no posee clave primaria autoincremental convencional en algunas configuraciones antiguas
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
         
@@ -357,3 +374,11 @@ def editar_producto(request, producto_id):
             messages.error(request, "Error: Los valores ingresados no son numéricos válidos.")
             
     return redirect('dashboard')
+
+# ==========================================
+# VISTA: CIERRE DE SESIÓN DIRECTO
+# ==========================================
+def logout_view(request):
+    logout(request)
+    # Redirecciona instantáneamente usando el 'name' de tu catálogo principal
+    return redirect('productos')

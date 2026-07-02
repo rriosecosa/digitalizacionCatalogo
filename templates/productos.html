@@ -490,14 +490,85 @@
         ul.lista-opciones {
             max-height: none;
         }
+
+        header.topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        }
+
+    .topbar-actions .btn-login {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--color-acento);
+        color: var(--color-primario);
+        padding: 10px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(232, 185, 35, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    .topbar-actions .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(232, 185, 35, 0.35);
+        background: #f0c334; /* Variante interactiva de var(--color-acento) */
+    }
     }
 </style>
 </head>
 <body>
 
-<header class="topbar">
-    <h1>Catálogo de Productos</h1>
-    <p>Explora la disponibilidad agrupada por modelo, marca y familia</p>
+<header class="topbar" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+    <div class="topbar-info" style="display: flex; flex-direction: column;">
+        <h1 style="margin: 0;">Catálogo de Productos</h1>
+        <p style="margin: 4px 0 0;">Explora la disponibilidad agrupada por modelo, marca y familia</p>
+    </div>
+    
+    <div class="topbar-actions">
+        {% if user.is_authenticated %}
+            <a href="{% url 'logout' %}" class="btn-login" style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: transparent;
+                color: #fff;
+                border: 2px solid rgba(255, 255, 255, 0.4);
+                padding: 10px 20px;
+                border-radius: var(--radio, 10px);
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 0.9rem;
+                transition: all 0.2s ease;
+            " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
+                Cerrar Sesión
+            </a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn-login" style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: var(--color-acento);
+                color: var(--color-primario);
+                padding: 10px 20px;
+                border-radius: var(--radio, 10px);
+                text-decoration: none;
+                font-weight: 700;
+                font-size: 0.9rem;
+                box-shadow: 0 4px 12px rgba(232, 185, 35, 0.2);
+                transition: all 0.2s ease;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(232, 185, 35, 0.35)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(232, 185, 35, 0.2)';">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0m-3 7c2.73 0 4.8-.11 6-.282V12.5a1.5 1.5 0 0 0-1.5-1.5h-9A1.5 1.5 0 0 0 2 12.5v.218c1.2.172 3.27.282 6.282.282z"/>
+                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
+                </svg>
+                Iniciar Sesión
+            </a>
+        {% endif %}
+    </div>
 </header>
 
 <div class="layout">
