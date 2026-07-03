@@ -325,6 +325,13 @@
         position: relative;
     }
 
+    /* ESTILO ADICIONAL PARA LA IMAGEN REAL SUBIDA */
+    .tarjeta .imagen-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
     .tarjeta .badge-variantes {
         position: absolute;
         top: 10px;
@@ -335,6 +342,7 @@
         font-weight: 600;
         padding: 3px 9px;
         border-radius: 999px;
+        z-index: 10;
     }
 
     .tarjeta .cuerpo {
@@ -515,7 +523,7 @@
     .topbar-actions .btn-login:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 16px rgba(232, 185, 35, 0.35);
-        background: #f0c334; /* Variante interactiva de var(--color-acento) */
+        background: #f0c334;
     }
     }
 </style>
@@ -682,7 +690,12 @@
                     <article class="tarjeta">
 
                         <div class="imagen-wrap">
-                            {{ grupo.nombre|slice:":2"|upper }}
+                            {% if grupo.imagen_url %}
+                                <img src="{{ grupo.imagen_url }}" alt="{{ grupo.nombre }}">
+                            {% else %}
+                                {{ grupo.nombre|slice:":2"|upper }}
+                            {% endif %}
+                            
                             {% if grupo.cantidad > 1 %}
                                 <span class="badge-variantes">{{ grupo.cantidad }} variantes</span>
                             {% endif %}

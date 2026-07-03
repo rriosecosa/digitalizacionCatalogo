@@ -94,3 +94,15 @@ class VistaProductoAgrupado(models.Model):
     class Meta:
         managed = False  # Django ignorará las migraciones para este modelo
         db_table = "vista_producto_agrupado"
+
+
+# =====================================================================
+# NUEVA FUNCIONALIDAD: MODELO PARA ALMACENAR IMÁGENES POR GRUPO
+# =====================================================================
+class ImagenProducto(models.Model):
+    grupo_nombre = models.CharField(max_length=255, unique=True, db_index=True)
+    imagen = models.ImageField(upload_to='productos/')
+    creado_el = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Imagen para {self.grupo_nombre}"

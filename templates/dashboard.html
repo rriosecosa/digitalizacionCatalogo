@@ -226,6 +226,14 @@
         }
         .btn-guardar:hover { background: var(--color-exito-hover); }
 
+        /* NUEVOS ESTILOS PARA LA IMAGEN EN LA TABLA */
+        .preview-img { width: 42px; height: 42px; object-fit: cover; border-radius: 6px; border: 1px solid var(--color-borde); display: block; }
+        .no-img { width: 42px; height: 42px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #94a3b8; border-radius: 6px; font-weight: bold; border: 1px dashed var(--color-borde); }
+        
+        /* ESTILO INTERFAZ CAMPO DE TEXTO PARA RUTA */
+        .input-route-custom { width: 140px; padding: 6px; border: 1px solid var(--color-borde); border-radius: 4px; font-size: 0.75rem; outline: none; }
+        .input-route-custom:focus { border-color: var(--color-primario-claro); }
+
         /* Paginación */
         .paginacion {
             display: flex;
@@ -304,7 +312,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Código</th>
+                    <th>Imagen</th> <th>Código</th>
                     <th>Descripción</th>
                     <th>Marca</th>
                     <th>Precio Base ($)</th>
@@ -317,6 +325,15 @@
                 <tr>
                     <form method="post" action="{% url 'editar_producto' prod.field_id %}">
                         {% csrf_token %}
+                        <input type="hidden" name="grupo_nombre" value="{{ prod.grupo_nombre }}">
+
+                        <td>
+                            {% if prod.imagen_url %}
+                                <img src="{{ prod.imagen_url }}" class="preview-img" alt="Foto">
+                            {% else %}
+                                <div class="no-img">N/A</div>
+                            {% endif %}
+                        </td>
                         <td>
                             <span style="font-family: monospace; background: #f1f5f9; padding: 4px 6px; border-radius:4px; font-weight: 600;">
                                 {{ prod.codigo|default:"---" }}
@@ -331,13 +348,16 @@
                             <input type="number" step="any" name="stock_disponible" class="input-edit" value="{{ prod.stock_disponible|default:'' }}">
                         </td>
                         <td>
-                            <button type="submit" class="btn-guardar">Guardar</button>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <input type="text" name="ruta_imagen_producto" class="input-route-custom" placeholder="ej: productos/foto.png" value="{{ prod.imagen_url|default:'' }}">
+                                <button type="submit" class="btn-guardar">Guardar</button>
+                            </div>
                         </td>
                     </form>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="text-align: center; color: var(--color-texto-suave); padding: 30px;">
+                    <td colspan="7" style="text-align: center; color: var(--color-texto-suave); padding: 30px;">
                         No se encontraron productos para modificar en esta selección.
                     </td>
                 </tr>

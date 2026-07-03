@@ -1,19 +1,26 @@
-from django.urls import path
-from .views import lista_productos, detalle_producto, dashboard_productos, editar_producto
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.urls import path
+
 from . import views
+from .views import detalle_producto, lista_productos
 
 urlpatterns = [
-    path('', lista_productos, name='productos'),
-    path('producto/<int:producto_id>/', detalle_producto, name='detalle_producto'),
-    path('detalle/<int:producto_id>/', detalle_producto, name='detalle'), 
-    
-   
-    path('dashboard/', dashboard_productos, name='dashboard'),
-    path('dashboard/editar/<int:producto_id>/', editar_producto, name='editar_producto'),
-
-    # Rutas de Autenticación y Dashboard
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
-    
-    path('logout/', views.logout_view, name='logout'),
+    path("", lista_productos, name="productos"),
+    path("producto/<int:producto_id>/", detalle_producto, name="detalle_producto"),
+    path("detalle/<int:producto_id>/", detalle_producto, name="detalle"),
+    path(
+        "login/",
+        auth_views.LoginView.as_view(template_name="registration/login.html"),
+        name="login",
+    ),
+    path("dashboard/", views.dashboard_productos, name="dashboard"),
+    path("editar/<int:producto_id>/", views.editar_producto, name="editar_producto"),
+    path("logout/", views.logout_view, name="logout"),
 ]
+
+# ESTAS LÍNEAS LE DICEN A DJANGO DÓNDE ENCONTRAR LAS IMÁGENES DE /media/ EN ENTORNO DE DESARROLLO
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

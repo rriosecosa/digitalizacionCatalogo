@@ -1,14 +1,15 @@
 from collections import OrderedDict
-from datetime import datetime, timedelta  # <-- REQUERIDO PARA LOS KPIS
+from datetime import datetime, timedelta
 
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout  # <-- REQUERIDO PARA LOGOUT
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import permission_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 
 from .agrupador import obtener_grupo
-from .models import FamiliaProducto, Producto
+from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor
+
 
 def lista_productos(request):
 
@@ -164,6 +165,12 @@ def lista_productos(request):
 
     lista_grupos = list(grupos.values())
 
+    # --- NUEVA FUNCIONALIDAD: MAPEO DE IMÁGENES AL CATÁLOGO (CORREGIDO DE 'nombre_grupo' A 'nombre') ---
+    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all()}
+    for g in lista_grupos:
+        g["imagen_url"] = imagenes_dict.get(g["nombre"], None)
+    # --------------------------------------------------------------------------------------------------
+
     # ==========================================
     # Contar variantes
     # ==========================================
@@ -297,10 +304,6 @@ def detalle_producto(request, producto_id):
     )
 
 
-from django.contrib.auth.decorators import permission_required
-from django.contrib import messages
-from django.shortcuts import redirect
-
 # ==========================================
 # VISTA: PANEL DASHBOARD PRINCIPAL
 # ==========================================
@@ -333,6 +336,14 @@ def dashboard_productos(request):
                texto_busqueda in (p.proveedor.marca if p.proveedor else "").lower()
         ]
 
+    # --- NUEVA FUNCIONALIDAD: MAPEAMOS LAS IMÁGENES AL OBJETO EN MEMORIA ---
+    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all()}
+    for p in productos_qs:
+        grupo_nombre = obtener_grupo(p.descripcion) or p.descripcion
+        p.imagen_url = imagenes_dict.get(grupo_nombre, None)
+        p.grupo_nombre = group_nombre = grupo_nombre
+    # ----------------------------------------------------------------------
+
     # Paginación interna del Dashboard
     paginator = Paginator(productos_qs, 20)
     page = request.GET.get("page")
@@ -352,6 +363,8 @@ def dashboard_productos(request):
             "kpi_nuevos_6_meses": kpi_nuevos_6_meses,
         }
     )
+
+
 # ==========================================
 # VISTA: ACCIÓN EDITAR PRODUCTO (POST)
 # ==========================================
@@ -361,6 +374,10 @@ def editar_producto(request, producto_id):
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
         
+        # --- CAMBIO AQUÍ: Ahora recibimos un texto con la ruta en lugar de un archivo ---
+        ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
+        grupo_nombre = request.POST.get("grupo_nombre")
+        
         try:
             precio_float = float(precio) if precio else None
             stock_float = float(stock) if stock else None
@@ -369,6 +386,20 @@ def editar_producto(request, producto_id):
                 precio_base_pesos=precio_float,
                 stock_disponible=stock_float
             )
+
+            # --- NUEVA LÓGICA: Guardar o actualizar la ruta de texto en el modelo de imagen ---
+            if grupo_nombre:
+                img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
+                
+                if ruta_imagen:
+                    # Guardamos la cadena de texto directamente en el campo de la imagen
+                    img_obj.imagen = ruta_imagen
+                    img_obj.save()
+                elif not created and not ruta_imagen:
+                    # Opcional: Si mandan el texto vacío, podrías elegir borrar el registro de imagen
+                    pass
+            # ---------------------------------------------------------------
+
             messages.success(request, "Producto actualizado correctamente.")
         except ValueError:
             messages.error(request, "Error: Los valores ingresados no son numéricos válidos.")
@@ -380,5 +411,4 @@ def editar_producto(request, producto_id):
 # ==========================================
 def logout_view(request):
     logout(request)
-    # Redirecciona instantáneamente usando el 'name' de tu catálogo principal
     return redirect('productos')

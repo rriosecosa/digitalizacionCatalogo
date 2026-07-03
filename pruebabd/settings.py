@@ -142,10 +142,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Archivos multimedia
 # --------------------------------------------------
 
-MEDIA_URL = "/media/"
-
-MEDIA_ROOT = BASE_DIR / "media"
-
 # --------------------------------------------------
 # Clave primaria
 # --------------------------------------------------
@@ -154,4 +150,31 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 #--------------------------------------------------------------------------
 # Redirigir al catálogo después de iniciar sesión con éxito
+LOGIN_REDIRECT_URL = 'dashboard'
+
+# ... Todo tu archivo de configuración settings.py se mantiene idéntico arriba ...
+
+# --------------------------------------------------
+# Archivos estáticos
+# --------------------------------------------------
+STATIC_URL = "static/"
+
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# --------------------------------------------------
+# Archivos multimedia (Verificar que estén tal cual al final)
+# --------------------------------------------------
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# --------------------------------------------------
+# Clave primaria por defecto
+# --------------------------------------------------
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Redirección de login automatizada
 LOGIN_REDIRECT_URL = 'dashboard'
