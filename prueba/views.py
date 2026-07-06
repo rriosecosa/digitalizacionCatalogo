@@ -166,7 +166,7 @@ def lista_productos(request):
     lista_grupos = list(grupos.values())
 
     # --- NUEVA FUNCIONALIDAD: MAPEO DE IMÁGENES AL CATÁLOGO (CORREGIDO DE 'nombre_grupo' A 'nombre') ---
-    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all()}
+    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all() if img.imagen}
     for g in lista_grupos:
         g["imagen_url"] = imagenes_dict.get(g["nombre"], None)
     # --------------------------------------------------------------------------------------------------
@@ -281,6 +281,20 @@ def detalle_producto(request, producto_id):
         
     marca_grupo = producto_base.proveedor.marca if producto_base.proveedor else ""
 
+    # --- NUEVA FUNCIONALIDAD: BUSCAR IMAGEN Y DESCRIPCIÓN ---
+    info_grupo = ImagenProducto.objects.filter(grupo_nombre=nombre_grupo).first()
+    imagen_url = None
+    descripcion_grupo = ""
+    
+    if info_grupo:
+        descripcion_grupo = info_grupo.descripcion or ""
+        if info_grupo.imagen:
+            try:
+                imagen_url = info_grupo.imagen.url
+            except ValueError:
+                imagen_url = info_grupo.imagen # Respaldo si se guardó como string directo
+    # --------------------------------------------------------
+
     # Buscamos en el total de productos sólo las variantes que caigan en este mismo grupo
     todos_los_productos = Producto.objects.select_related("proveedor").exclude(descripcion__startswith="***")
     
@@ -300,6 +314,8 @@ def detalle_producto(request, producto_id):
             "marca": marca_grupo,
             "producto_base": producto_base,
             "variantes": variantes,
+            "imagen_url": imagen_url,              # <-- ENVIAMOS LA IMAGEN AL TEMPLATE
+            "descripcion_grupo": descripcion_grupo # <-- ENVIAMOS LA DESCRIPCIÓN AL TEMPLATE
         },
     )
 
@@ -336,13 +352,16 @@ def dashboard_productos(request):
                texto_busqueda in (p.proveedor.marca if p.proveedor else "").lower()
         ]
 
-    # --- NUEVA FUNCIONALIDAD: MAPEAMOS LAS IMÁGENES AL OBJETO EN MEMORIA ---
-    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all()}
+    # --- NUEVA FUNCIONALIDAD: MAPEAMOS LAS IMÁGENES Y DESCRIPCIONES AL OBJETO EN MEMORIA ---
+    info_grupos_qs = ImagenProducto.objects.all()
+    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in info_grupos_qs if img.imagen}
+    descripciones_dict = {img.grupo_nombre: img.descripcion for img in info_grupos_qs if img.descripcion}
     for p in productos_qs:
         grupo_nombre = obtener_grupo(p.descripcion) or p.descripcion
         p.imagen_url = imagenes_dict.get(grupo_nombre, None)
-        p.grupo_nombre = group_nombre = grupo_nombre
-    # ----------------------------------------------------------------------
+        p.descripcion_grupo = descripciones_dict.get(grupo_nombre, "")
+        p.grupo_nombre = grupo_nombre
+    # ----------------------------------------------------------------------------------------
 
     # Paginación interna del Dashboard
     paginator = Paginator(productos_qs, 20)
@@ -374,9 +393,12 @@ def editar_producto(request, producto_id):
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
         
-        # --- CAMBIO AQUÍ: Ahora recibimos un texto con la ruta en lugar de un archivo ---
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
         grupo_nombre = request.POST.get("grupo_nombre")
+        
+        # --- NUEVA LÓGICA: Recibimos la descripción desde el form del dashboard ---
+        descripcion_grupo = request.POST.get("descripcion_grupo")
+        # --------------------------------------------------------------------------
         
         try:
             precio_float = float(precio) if precio else None
@@ -387,17 +409,17 @@ def editar_producto(request, producto_id):
                 stock_disponible=stock_float
             )
 
-            # --- NUEVA LÓGICA: Guardar o actualizar la ruta de texto en el modelo de imagen ---
+            # --- NUEVA LÓGICA: Guardar/actualizar la ruta y la descripción ---
             if grupo_nombre:
                 img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
                 
                 if ruta_imagen:
-                    # Guardamos la cadena de texto directamente en el campo de la imagen
                     img_obj.imagen = ruta_imagen
-                    img_obj.save()
-                elif not created and not ruta_imagen:
-                    # Opcional: Si mandan el texto vacío, podrías elegir borrar el registro de imagen
-                    pass
+                    
+                if descripcion_grupo is not None: # Guarda si lo envían (incluso si está vacío para borrarla)
+                    img_obj.descripcion = descripcion_grupo.strip()
+                    
+                img_obj.save()
             # ---------------------------------------------------------------
 
             messages.success(request, "Producto actualizado correctamente.")

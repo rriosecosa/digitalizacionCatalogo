@@ -121,6 +121,20 @@
         {% endif %}
     </div>
 
+    <div style="display: flex; gap: 25px; margin-bottom: 30px; align-items: flex-start; flex-wrap: wrap;">
+        {% if imagen_url %}
+        <div style="flex-shrink: 0; width: 220px; border: 1px solid var(--color-borde); border-radius: var(--radio); overflow: hidden; background: #fff; padding: 10px;">
+            <img src="{{ imagen_url }}" alt="{{ nombre_grupo }}" style="width: 100%; height: auto; display: block; border-radius: 6px;">
+        </div>
+        {% endif %}
+
+        {% if descripcion_grupo %}
+        <div style="flex-grow: 1; min-width: 250px; background: #f9fafb; padding: 20px; border-radius: var(--radio); border: 1px solid var(--color-borde);">
+            <h4 style="margin-top: 0; color: var(--color-primario); margin-bottom: 10px; font-size: 1.1rem;">Descripción del Producto</h4>
+            <p style="margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--color-texto);">{{ descripcion_grupo|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+    </div>
     <h3>Medidas y Variantes Disponibles:</h3>
     <div class="table-wrapper">
         <table>

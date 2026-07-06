@@ -6,53 +6,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Catálogo de Productos</title>
 <link rel="stylesheet" href="{% static 'css/productos.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body>
 
-<header class="topbar" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-    <div class="topbar-info" style="display: flex; flex-direction: column;">
-        <h1 style="margin: 0;">Catálogo de Productos</h1>
-        <p style="margin: 4px 0 0;">Explora la disponibilidad agrupada por modelo, marca y familia</p>
+<header class="topbar">
+    <div class="topbar-info">
+        <h1>Catálogo de Productos</h1>
+        <p>Explora la disponibilidad agrupada por modelo, marca y familia</p>
     </div>
     
     <div class="topbar-actions">
         {% if user.is_authenticated %}
-            <a href="{% url 'logout' %}" class="btn-login" style="
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                background: transparent;
-                color: #fff;
-                border: 2px solid rgba(255, 255, 255, 0.4);
-                padding: 10px 20px;
-                border-radius: var(--radio, 10px);
-                text-decoration: none;
-                font-weight: 600;
-                font-size: 0.9rem;
-                transition: all 0.2s ease;
-            " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
-                Cerrar Sesión
+            <a href="{% url 'dashboard' %}" class="btn-dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a href="{% url 'logout' %}" class="btn-logout">
+                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
             </a>
         {% else %}
-            <a href="{% url 'login' %}" class="btn-login" style="
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                background: var(--color-acento);
-                color: var(--color-primario);
-                padding: 10px 20px;
-                border-radius: var(--radio, 10px);
-                text-decoration: none;
-                font-weight: 700;
-                font-size: 0.9rem;
-                box-shadow: 0 4px 12px rgba(232, 185, 35, 0.2);
-                transition: all 0.2s ease;
-            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(232, 185, 35, 0.35)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(232, 185, 35, 0.2)';">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0m-3 7c2.73 0 4.8-.11 6-.282V12.5a1.5 1.5 0 0 0-1.5-1.5h-9A1.5 1.5 0 0 0 2 12.5v.218c1.2.172 3.27.282 6.282.282z"/>
-                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
-                </svg>
-                Iniciar Sesión
+            <a href="{% url 'login' %}" class="btn-login">
+                <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
             </a>
         {% endif %}
     </div>
@@ -191,10 +165,24 @@
                             {% if grupo.familia %}
                                 <span class="familia">{{ grupo.familia.descripcion }}</span>
                             {% endif %}
+                            
+                            {% if grupo.descripcion_grupo %}
+                                <p class="desc-grupo" style="font-size: 0.85rem; color: #64748b; margin: 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">
+                                    {{ grupo.descripcion_grupo }}
+                                </p>
+                            {% elif grupo.cantidad == 1 and grupo.productos.0.descripcion %}
+                                <p class="desc-grupo" style="font-size: 0.85rem; color: #64748b; margin: 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">
+                                    {{ grupo.productos.0.descripcion }}
+                                </p>
+                            {% endif %}
 
                             {% if grupo.cantidad > 1 %}
                                 <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle">
                                     Ver {{ grupo.cantidad }} variantes
+                                </a>
+                            {% else %}
+                                <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle" style="background-color: #f1f5f9; color: #3b82f6; border: 1px solid #cbd5e1;">
+                                    Ver detalle
                                 </a>
                             {% endif %}
 

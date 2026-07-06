@@ -97,12 +97,17 @@ class VistaProductoAgrupado(models.Model):
 
 
 # =====================================================================
-# NUEVA FUNCIONALIDAD: MODELO PARA ALMACENAR IMÁGENES POR GRUPO
+# NUEVA FUNCIONALIDAD: MODELO PARA ALMACENAR IMÁGENES Y DESCRIPCIONES
 # =====================================================================
 class ImagenProducto(models.Model):
     grupo_nombre = models.CharField(max_length=255, unique=True, db_index=True)
     imagen = models.ImageField(upload_to='productos/')
+    
+    # --- NUEVO CAMPO AÑADIDO: DESCRIPCIÓN DEL PRODUCTO ---
+    descripcion = models.TextField(blank=True, null=True)
+    # -----------------------------------------------------
+    
     creado_el = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Imagen para {self.grupo_nombre}"
+        return f"Datos para {self.grupo_nombre}"
