@@ -1,0 +1,259 @@
+:root {
+    --color-primario: #0f172a;
+    --color-primario-claro: #3b82f6;
+    --color-fondo: #f8fafc;
+    --color-borde: #e2e8f0;
+    --color-texto: #1e293b;
+    --color-texto-suave: #64748b;
+    --color-danger: #e11d48;
+    --color-danger-hover: #be123c;
+    --radio: 12px;
+    --radio-sm: 8px;
+    --sombra: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --transicion: all 0.2s ease;
+}
+
+body {
+    font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+    background: var(--color-fondo);
+    margin: 0;
+    padding: 40px 20px;
+    color: var(--color-texto);
+}
+
+.export-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 35px;
+    border-radius: var(--radio);
+    box-shadow: var(--sombra);
+    border: 1px solid var(--color-borde);
+}
+
+.export-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-borde);
+    padding-bottom: 20px;
+    margin-bottom: 25px;
+}
+
+.export-header h2 {
+    margin: 0;
+    color: var(--color-primario);
+    font-size: 1.6rem;
+    font-weight: 800;
+}
+
+.btn-volver {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-texto-suave);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 8px 16px;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-sm);
+    transition: var(--transicion);
+}
+.btn-volver:hover {
+    background: #f1f5f9;
+    color: var(--color-texto);
+}
+
+.export-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    padding: 16px 20px;
+    border-radius: var(--radio-sm);
+    margin-bottom: 30px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+.export-alert svg { flex-shrink: 0; margin-top: 2px; }
+
+/* Acordeón Personalizado */
+.accordion-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 40px;
+}
+
+.accordion-item {
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-sm);
+    background: #fff;
+    overflow: hidden;
+}
+
+.accordion-title-bar {
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.accordion-btn {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    padding: 0 0 0 16px;
+    font-family: inherit;
+    color: var(--color-texto);
+}
+
+.fam-name {
+    font-weight: 700;
+    font-size: 1rem;
+    flex-grow: 1;
+}
+
+.fam-badge {
+    background: #e2e8f0;
+    color: var(--color-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-right: 16px;
+}
+
+.chevron {
+    color: var(--color-texto-suave);
+    transition: transform 0.3s ease;
+}
+
+.accordion-body {
+    padding: 20px;
+    background: #fff;
+    transition: all 0.3s ease;
+}
+.accordion-body.closed {
+    display: none;
+}
+
+.grid-grupos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.grupo-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.grupo-label:hover {
+    background: #f1f5f9;
+}
+.grupo-name {
+    font-size: 0.85rem;
+    color: var(--color-texto);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Checkboxes Personalizados */
+.custom-checkbox {
+    position: relative;
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+}
+.custom-checkbox input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.checkmark {
+    position: absolute;
+    top: 0; left: 0;
+    height: 22px; width: 22px;
+    background-color: #fff;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    transition: var(--transicion);
+    cursor: pointer;
+}
+.custom-checkbox:hover input ~ .checkmark { border-color: var(--color-primario-claro); }
+.custom-checkbox input:checked ~ .checkmark {
+    background-color: var(--color-primario-claro);
+    border-color: var(--color-primario-claro);
+}
+/* Icono de Check */
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+    left: 7px; top: 3px;
+    width: 5px; height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.custom-checkbox input:checked ~ .checkmark:after { display: block; }
+/* Indeterminado */
+.custom-checkbox input:indeterminate ~ .checkmark {
+    background-color: var(--color-primario-claro);
+    border-color: var(--color-primario-claro);
+}
+.custom-checkbox input:indeterminate ~ .checkmark:after {
+    display: block;
+    border: solid white;
+    border-width: 0 0 2px 0;
+    width: 10px; height: 0;
+    transform: rotate(0deg);
+    top: 9px; left: 4px;
+}
+
+.custom-checkbox.small { width: 18px; height: 18px; }
+.custom-checkbox.small .checkmark { width: 18px; height: 18px; border-width: 1.5px; border-radius: 4px;}
+.custom-checkbox.small .checkmark:after { left: 5px; top: 2px; width: 4px; height: 8px;}
+
+/* Botón Final Generar PDF */
+.export-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 20px;
+}
+
+.btn-generar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-danger);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: var(--radio-sm);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transicion);
+    box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.4);
+}
+.btn-generar:hover {
+    background: var(--color-danger-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px -2px rgba(225, 29, 72, 0.5);
+}
+.btn-generar:active { transform: translateY(0); }

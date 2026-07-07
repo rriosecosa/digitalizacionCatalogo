@@ -1,0 +1,114 @@
+{% load static %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/exportar.css' %}">
+
+<div class="export-container">
+    <div class="export-header">
+        <h2>Exportar Catálogo a PDF</h2>
+        <a href="{% url 'dashboard' %}" class="btn-volver">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Volver al Panel
+        </a>
+    </div>
+    
+    <div class="export-alert">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span>Selecciona las familias o productos que deseas incluir. <strong>Por defecto, todo el catálogo está seleccionado.</strong> Si deseas excluir algo, simplemente desmárcalo.</span>
+    </div>
+    
+    <form action="{% url 'generar_pdf' %}" method="POST">
+        {% csrf_token %}
+        
+        <div class="accordion-container">
+            {% for familia, grupos in arbol_familias.items %}
+            <div class="accordion-item">
+                <div class="accordion-title-bar">
+                    <label class="custom-checkbox">
+                        <input type="checkbox" class="familia-checkbox" id="fam-{{ forloop.counter }}" checked>
+                        <span class="checkmark"></span>
+                    </label>
+                    <button class="accordion-btn" type="button" onclick="toggleAccordion('collapse-{{ forloop.counter }}')">
+                        <span class="fam-name">{{ familia }}</span>
+                        <span class="fam-badge">{{ grupos|length }} grupos</span>
+                        <svg class="chevron" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                
+                <div id="collapse-{{ forloop.counter }}" class="accordion-body closed">
+                    <div class="grid-grupos">
+                        {% for grupo in grupos %}
+                        <label class="grupo-label" title="{{ grupo }}">
+                            <div class="custom-checkbox small">
+                                <input type="checkbox" name="grupos_seleccionados" value="{{ grupo }}" class="grupo-checkbox fam-child-{{ forloop.parentloop.counter }}" checked>
+                                <span class="checkmark"></span>
+                            </div>
+                            <span class="grupo-name">{{ grupo }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="export-footer">
+            <button type="submit" class="btn-generar">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Generar Documento PDF
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // 0. Toggle de acordeones
+    function toggleAccordion(id) {
+        const element = document.getElementById(id);
+        const icon = element.previousElementSibling.querySelector('.chevron');
+        if (element.classList.contains('closed')) {
+            element.classList.remove('closed');
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            element.classList.add('closed');
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // 1. Si desmarco una familia completa, se desmarcan todos sus productos dentro
+        const familiaCheckboxes = document.querySelectorAll('.familia-checkbox');
+        
+        familiaCheckboxes.forEach(function(famCheck) {
+            famCheck.addEventListener('change', function() {
+                const famId = this.id.split('-')[1]; 
+                const childCheckboxes = document.querySelectorAll('.fam-child-' + famId);
+                
+                childCheckboxes.forEach(function(child) {
+                    child.checked = famCheck.checked;
+                });
+            });
+        });
+
+        // 2. Si desmarco un producto suelto, la familia se ajusta
+        const grupoCheckboxes = document.querySelectorAll('.grupo-checkbox');
+        
+        grupoCheckboxes.forEach(function(grupoCheck) {
+            grupoCheck.addEventListener('change', function() {
+                const famClass = Array.from(this.classList).find(cls => cls.startsWith('fam-child-'));
+                if (famClass) {
+                    const famId = famClass.split('-')[2];
+                    const parentFamCheck = document.getElementById('fam-' + famId);
+                    
+                    const siblings = document.querySelectorAll('.' + famClass);
+                    const allChecked = Array.from(siblings).every(c => c.checked);
+                    const someChecked = Array.from(siblings).some(c => c.checked);
+                    
+                    parentFamCheck.checked = allChecked;
+                    parentFamCheck.indeterminate = !allChecked && someChecked;
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

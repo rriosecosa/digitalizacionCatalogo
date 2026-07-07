@@ -178,3 +178,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Redirección de login automatizada
 LOGIN_REDIRECT_URL = 'dashboard'
+
+# Aumentamos el límite de campos para permitir el envío del catálogo Ecosa completo
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000

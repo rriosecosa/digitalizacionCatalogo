@@ -7,9 +7,14 @@ from django.contrib.auth.decorators import permission_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 
-from .agrupador import obtener_grupo
-from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor
+# Ya no necesitamos usar el agrupador en Python porque Neon lo hace en SQL
+# from .agrupador import obtener_grupo 
 
+from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.db.models import Case, When, Value, IntegerField
+import weasyprint
 
 def lista_productos(request):
 
@@ -31,11 +36,11 @@ def lista_productos(request):
     }
 
     # ==========================================
-    # Productos
+    # Productos (AHORA LEE DESDE LA VISTA SQL)
     # ==========================================
 
     productos = (
-        Producto.objects
+        VistaProductoAgrupado.objects
         .select_related("proveedor")
         .exclude(descripcion__startswith="***")
         .order_by("descripcion")
@@ -50,10 +55,10 @@ def lista_productos(request):
     for p in productos:
 
         # -------------------------
-        # Grupo
+        # Grupo (AHORA LO TOMA DIRECTO DE LA BD)
         # -------------------------
 
-        grupo = obtener_grupo(p.descripcion)
+        grupo = p.descripcion_grupo
 
         if not grupo:
             grupo = p.descripcion
@@ -125,7 +130,7 @@ def lista_productos(request):
         if grupo not in grupos:
 
             grupos[grupo] = {
-                "id_referencia": p.field_id, # <-- GUARDAMOS EL ID PARA LA URL DEL DETALLE
+                "id_referencia": p.id, # <-- Mapeado al "id" de la vista SQL
 
                 "nombre": grupo,
 
@@ -165,11 +170,10 @@ def lista_productos(request):
 
     lista_grupos = list(grupos.values())
 
-    # --- NUEVA FUNCIONALIDAD: MAPEO DE IMÁGENES AL CATÁLOGO (CORREGIDO DE 'nombre_grupo' A 'nombre') ---
+    # --- MAPEAMOS LAS IMÁGENES AL CATÁLOGO ---
     imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all() if img.imagen}
     for g in lista_grupos:
         g["imagen_url"] = imagenes_dict.get(g["nombre"], None)
-    # --------------------------------------------------------------------------------------------------
 
     # ==========================================
     # Contar variantes
@@ -268,20 +272,19 @@ def lista_productos(request):
 
 
 # ==========================================
-# NUEVA VISTA: VISTA DETALLE INDEPENDIENTE
+# VISTA: DETALLE INDEPENDIENTE
 # ==========================================
 def detalle_producto(request, producto_id):
-    # Conseguimos el producto de ancla para el detalle
-    producto_base = get_object_or_404(Producto.objects.select_related("proveedor"), field_id=producto_id)
+    # Leemos directo desde la VISTA
+    producto_base = get_object_or_404(VistaProductoAgrupado.objects.select_related("proveedor"), id=producto_id)
     
-    # Identificamos su grupo raíz con tu función nativa
-    nombre_grupo = obtener_grupo(producto_base.descripcion)
+    # Tomamos el grupo ya calculado
+    nombre_grupo = producto_base.descripcion_grupo
     if not nombre_grupo:
         nombre_grupo = producto_base.descripcion
         
     marca_grupo = producto_base.proveedor.marca if producto_base.proveedor else ""
 
-    # --- NUEVA FUNCIONALIDAD: BUSCAR IMAGEN Y DESCRIPCIÓN ---
     info_grupo = ImagenProducto.objects.filter(grupo_nombre=nombre_grupo).first()
     imagen_url = None
     descripcion_grupo = ""
@@ -292,15 +295,14 @@ def detalle_producto(request, producto_id):
             try:
                 imagen_url = info_grupo.imagen.url
             except ValueError:
-                imagen_url = info_grupo.imagen # Respaldo si se guardó como string directo
-    # --------------------------------------------------------
+                imagen_url = info_grupo.imagen 
 
-    # Buscamos en el total de productos sólo las variantes que caigan en este mismo grupo
-    todos_los_productos = Producto.objects.select_related("proveedor").exclude(descripcion__startswith="***")
+    todos_los_productos = VistaProductoAgrupado.objects.select_related("proveedor").exclude(descripcion__startswith="***")
     
     variantes = []
     for p in todos_los_productos:
-        g = obtener_grupo(p.descripcion) or p.descripcion
+        # Tomamos el grupo ya calculado
+        g = p.descripcion_grupo or p.descripcion
         m = p.proveedor.marca if p.proveedor else ""
         
         if g == nombre_grupo and m == marca_grupo:
@@ -314,8 +316,8 @@ def detalle_producto(request, producto_id):
             "marca": marca_grupo,
             "producto_base": producto_base,
             "variantes": variantes,
-            "imagen_url": imagen_url,              # <-- ENVIAMOS LA IMAGEN AL TEMPLATE
-            "descripcion_grupo": descripcion_grupo # <-- ENVIAMOS LA DESCRIPCIÓN AL TEMPLATE
+            "imagen_url": imagen_url,              
+            "descripcion_grupo": descripcion_grupo 
         },
     )
 
@@ -327,24 +329,21 @@ def detalle_producto(request, producto_id):
 def dashboard_productos(request):
     texto_busqueda = request.GET.get("q", "").strip().lower()
     
-    # 1. Consulta base de datos limpia (Sin alterar)
-    productos_base_qs = Producto.objects.exclude(descripcion__startswith="***")
+    # 1. Consulta desde la VISTA SQL
+    productos_base_qs = VistaProductoAgrupado.objects.exclude(descripcion__startswith="***")
     
-    # 2. --- CÁLCULO DE KPIS REALES ---
+    # 2. Cálculos originales
     kpi_productos_activos = productos_base_qs.count()
     kpi_familias_activas = FamiliaProducto.objects.count()
     kpi_proveedores = productos_base_qs.values("proveedor__marca").distinct().exclude(proveedor__marca="").count()
 
-    # Validación de fecha para productos de los últimos 6 meses
     hace_seis_meses = datetime.now() - timedelta(days=180)
-    kpi_nuevos_6_meses = productos_base_qs.filter(fecha_creacion__gte=hace_seis_meses).count() if hasattr(Producto, 'fecha_creacion') else 0
-    # ----------------------------------
+    kpi_nuevos_6_meses = productos_base_qs.filter(fecha_creacion__gte=hace_seis_meses).count() if hasattr(VistaProductoAgrupado, 'fecha_creacion') else 0
 
-    # 3. Traemos el listado ordenado para la visualización de la tabla del administrador
+    # 3. Listado
     productos_qs = productos_base_qs.select_related("proveedor").order_by("descripcion")
     
     if texto_busqueda:
-        # Mantenemos tu filtro original exacto en memoria
         productos_qs = [
             p for p in productos_qs 
             if texto_busqueda in (p.descripcion or "").lower() or 
@@ -352,18 +351,19 @@ def dashboard_productos(request):
                texto_busqueda in (p.proveedor.marca if p.proveedor else "").lower()
         ]
 
-    # --- NUEVA FUNCIONALIDAD: MAPEAMOS LAS IMÁGENES Y DESCRIPCIONES AL OBJETO EN MEMORIA ---
     info_grupos_qs = ImagenProducto.objects.all()
     imagenes_dict = {img.grupo_nombre: img.imagen.url for img in info_grupos_qs if img.imagen}
     descripciones_dict = {img.grupo_nombre: img.descripcion for img in info_grupos_qs if img.descripcion}
+    
     for p in productos_qs:
-        grupo_nombre = obtener_grupo(p.descripcion) or p.descripcion
+        # Tomamos el grupo directo de SQL
+        grupo_nombre = p.descripcion_grupo or p.descripcion
         p.imagen_url = imagenes_dict.get(grupo_nombre, None)
         p.descripcion_grupo = descripciones_dict.get(grupo_nombre, "")
         p.grupo_nombre = grupo_nombre
-    # ----------------------------------------------------------------------------------------
+        # Hacemos compatible la VISTA con la edición del HTML
+        p.field_id = p.id 
 
-    # Paginación interna del Dashboard
     paginator = Paginator(productos_qs, 20)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
@@ -375,7 +375,6 @@ def dashboard_productos(request):
             "productos": page_obj,
             "page_obj": page_obj,
             "busqueda": texto_busqueda,
-            # Variables requeridas por el diseño de tu dashboard.html
             "kpi_productos_activos": kpi_productos_activos,
             "kpi_familias_activas": kpi_familias_activas,
             "kpi_proveedores": kpi_proveedores,
@@ -396,31 +395,28 @@ def editar_producto(request, producto_id):
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
         grupo_nombre = request.POST.get("grupo_nombre")
         
-        # --- NUEVA LÓGICA: Recibimos la descripción desde el form del dashboard ---
         descripcion_grupo = request.POST.get("descripcion_grupo")
-        # --------------------------------------------------------------------------
         
         try:
             precio_float = float(precio) if precio else None
             stock_float = float(stock) if stock else None
             
+            # ATENCIÓN: La edición se sigue guardando en la tabla original Producto
             Producto.objects.filter(field_id=producto_id).update(
                 precio_base_pesos=precio_float,
                 stock_disponible=stock_float
             )
 
-            # --- NUEVA LÓGICA: Guardar/actualizar la ruta y la descripción ---
             if grupo_nombre:
                 img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
                 
                 if ruta_imagen:
                     img_obj.imagen = ruta_imagen
                     
-                if descripcion_grupo is not None: # Guarda si lo envían (incluso si está vacío para borrarla)
+                if descripcion_grupo is not None:
                     img_obj.descripcion = descripcion_grupo.strip()
                     
                 img_obj.save()
-            # ---------------------------------------------------------------
 
             messages.success(request, "Producto actualizado correctamente.")
         except ValueError:
@@ -434,3 +430,105 @@ def editar_producto(request, producto_id):
 def logout_view(request):
     logout(request)
     return redirect('productos')
+
+def menu_exportar_pdf(request):
+    productos = VistaProductoAgrupado.objects.exclude(descripcion__startswith="***").order_by('descripcion_grupo')
+    
+    # ¡LA CLAVE DE LA VELOCIDAD! Traemos todas las familias a la memoria RAM de una sola vez
+    familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
+    
+    arbol_familias = {}
+    
+    for p in productos:
+        # Calculamos la familia instantáneamente desde el diccionario, SIN consultar a Neon 3000 veces
+        familia_desc = "Sin Familia"
+        if p.codigo and "-" in p.codigo:
+            partes = p.codigo.split("-")
+            if len(partes) >= 2:
+                familia_desc = familias_dict.get(partes[1], "Sin Familia")
+        
+        grupo = p.descripcion_grupo or p.descripcion
+        
+        if familia_desc not in arbol_familias:
+            arbol_familias[familia_desc] = set()
+        
+        arbol_familias[familia_desc].add(grupo)
+        
+    for f in arbol_familias:
+        arbol_familias[f] = sorted(list(arbol_familias[f]))
+        
+    arbol_familias = dict(sorted(arbol_familias.items()))
+        
+    return render(request, 'exportar.html', {'arbol_familias': arbol_familias})
+
+
+def generar_pdf(request):
+    if request.method == 'POST':
+        grupos_seleccionados = request.POST.getlist('grupos_seleccionados')
+        
+        if not grupos_seleccionados:
+            return redirect('menu_exportar')
+        
+        qs = VistaProductoAgrupado.objects.filter(
+            descripcion_grupo__in=grupos_seleccionados
+        ).annotate(
+            es_truper=Case(
+                When(proveedor__marca__iexact='truper', then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        )
+
+        productos = list(qs)
+        
+        # Volvemos a usar el diccionario veloz para el generador PDF
+        familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
+
+        # Asignamos la familia temporalmente a cada objeto en RAM para poder ordenarlos
+        for p in productos:
+            p.familia_temporal = "Sin Familia"
+            if p.codigo and "-" in p.codigo:
+                partes = p.codigo.split("-")
+                if len(partes) >= 2:
+                    p.familia_temporal = familias_dict.get(partes[1], "Sin Familia")
+
+        # REGLA DE ORO DE TRUPER (Orden rápido en RAM)
+        productos.sort(key=lambda p: (
+            p.es_truper, 
+            p.familia_temporal, 
+            p.descripcion_grupo or p.descripcion or ""
+        ))
+
+        imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.all() if img.imagen}
+        descripciones_dict = {img.grupo_nombre: img.descripcion for img in ImagenProducto.objects.all() if img.descripcion}
+        
+        catalogo = {}
+        for p in productos:
+            familia = p.familia_temporal
+            grupo = p.descripcion_grupo or p.descripcion
+            
+            if familia not in catalogo:
+                catalogo[familia] = {}
+            
+            if grupo not in catalogo[familia]:
+                catalogo[familia][grupo] = {
+                    'imagen_url': imagenes_dict.get(grupo, None),
+                    'descripcion': descripciones_dict.get(grupo, ""),
+                    'variantes': []
+                }
+            
+            catalogo[familia][grupo]['variantes'].append(p)
+
+        html_string = render_to_string('catalogo_pdf.html', {
+            'catalogo': catalogo,
+            'request': request,
+        })
+
+        html = weasyprint.HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf_file = html.write_pdf()
+
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = 'inline; filename="Catalogo_Ecosa.pdf"'
+        return response
+    
+    return redirect('menu_exportar')

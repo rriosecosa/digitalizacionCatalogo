@@ -586,3 +586,25 @@ tr:hover td { background: #f4f8ff; }
     .preview-img, .no-img { margin: 0; }
     .modal-grid { grid-template-columns: 1fr; }
 }
+.btn-export-pdf {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    background: #e11d48; /* Rojo vibrante PDF */
+    color: white;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-radius: var(--radio-sm);
+    box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.3);
+    transition: var(--transicion);
+}
+.btn-export-pdf:hover {
+    background: #be123c;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px -2px rgba(225, 29, 72, 0.4);
+}
+.btn-export-pdf:active {
+    transform: translateY(0);
+}

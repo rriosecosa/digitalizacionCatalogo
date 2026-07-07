@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Catálogo Ecosa</title>
+    <style>
+        /* =========================================
+           REGLAS DE IMPRESIÓN (WeasyPrint)
+           ========================================= */
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @bottom-center {
+                content: "Página " counter(page);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+        
+        /* Regla exclusiva para la primera hoja (La Portada) */
+        @page :first {
+            background-image: url('{{ request.scheme }}://{{ request.get_host }}/static/img/portada_catalogo.jpg');
+            background-size: cover;
+            background-position: center;
+            margin: 0;
+            @bottom-center { content: ""; } /* Quita la numeración en la portada */
+        }
+
+        /* =========================================
+           DISEÑO DEL CONTENIDO
+           ========================================= */
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #333;
+            font-size: 10px; /* Letra pequeña para optimizar espacio */
+        }
+
+        .salto-portada {
+            page-break-after: always;
+            height: 100vh;
+        }
+
+        /* Bloque azul de Familia */
+        .titulo-familia {
+            background-color: #003366;
+            color: white;
+            padding: 8px;
+            font-size: 14px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        /* La Tarjeta del Producto */
+        .producto-grupo {
+            page-break-inside: avoid; /* REGLA VITAL: Evita que el producto se corte entre páginas */
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 10px;
+        }
+
+        .producto-titulo {
+            font-size: 13px;
+            color: #004080;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        /* Simulamos columnas con un contenedor table para compatibilidad absoluta en WeasyPrint */
+        .contenedor-detalle {
+            display: table;
+            width: 100%;
+        }
+        
+        .columna-imagen {
+            display: table-cell;
+            width: 25%;
+            vertical-align: top;
+            text-align: center;
+        }
+
+        .columna-tabla {
+            display: table-cell;
+            width: 75%;
+            vertical-align: top;
+            padding-left: 15px;
+        }
+
+        .producto-imagen {
+            max-width: 100%;
+            max-height: 100px; /* Altura restringida para asegurar +6 por página */
+            object-fit: contain;
+        }
+
+        /* Tabla de variantes */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="salto-portada">
+        </div>
+
+    {% for familia, grupos in catalogo.items %}
+        <div class="titulo-familia">{{ familia }}</div>
+
+        {% for nombre_grupo, datos in grupos.items %}
+            <div class="producto-grupo">
+                <div class="producto-titulo">{{ nombre_grupo }}</div>
+                
+                <div class="contenedor-detalle">
+                    <div class="columna-imagen">
+                        {% if datos.imagen_url %}
+                            <img src="{{ request.scheme }}://{{ request.get_host }}{{ datos.imagen_url }}" class="producto-imagen" alt="Imagen del producto">
+                        {% else %}
+                            <div style="color:#aaa; font-style:italic; padding-top:20px;">Sin imagen</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="columna-tabla">
+                        {% if datos.descripcion %}
+                            <div style="margin-bottom:5px; font-style:italic; color:#555;">{{ datos.descripcion }}</div>
+                        {% endif %}
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:25%;">Código Interno</th>
+                                    <th style="width:55%;">Descripción de Medida</th>
+                                    <th style="width:20%;">Precio Base</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in datos.variantes %}
+                                <tr>
+                                    <td>{{ p.codigo }}</td>
+                                    <td>{{ p.descripcion }}</td>
+                                    <td>
+                                        {% if p.precio_base_pesos %}
+                                            ${{ p.precio_base_pesos|floatformat:0 }}
+                                        {% else %}
+                                            Consultar
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% endfor %}
+
+</body>
+</html>
