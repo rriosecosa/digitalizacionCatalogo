@@ -13,6 +13,8 @@ from django.template.loader import render_to_string
 from django.db.models import Case, When, Value, IntegerField
 import weasyprint
 from weasyprint import HTML
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.exceptions import PermissionDenied
 
 def lista_productos(request):
     # ==========================================
@@ -219,7 +221,7 @@ def detalle_producto(request, producto_id):
 # ==========================================
 # VISTA: PANEL DASHBOARD PRINCIPAL
 # ==========================================
-@permission_required('prueba.change_producto', login_url='login')
+@login_required(login_url='/login/')
 def dashboard_productos(request):
     texto_busqueda = request.GET.get("q", "").strip().lower()
     productos_base_qs = VistaProductoAgrupado.objects.exclude(descripcion__startswith="***")
@@ -312,12 +314,10 @@ def editar_producto(request, producto_id):
 
 # ==========================================
 # VISTA: CIERRE DE SESIÓN DIRECTO
-# ==========================================
+# --- 1. FUNCIÓN DE CERRAR SESIÓN SEGURA ---
 def logout_view(request):
     logout(request)
-    return redirect('productos')
-
-
+    return redirect('login')
 # ==========================================
 # VISTA: MENÚ EXPORTAR A PDF
 # ==========================================
@@ -354,7 +354,13 @@ def menu_exportar(request):
 # ==========================================
 # VISTA: GENERAR PDF FINAL CON WEASYPRINT
 # ==========================================
-@login_required
+def es_admin(user):
+    if user.is_superuser:
+        return True
+    raise PermissionDenied # Muestra el error 403 de "Acceso Denegado"
+
+@login_required(login_url='/login/')
+@user_passes_test(es_admin)
 def generar_pdf(request):
     if request.method == 'POST':
         grupos_seleccionados = request.POST.getlist('grupos_seleccionados')

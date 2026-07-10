@@ -2,12 +2,22 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import path, include
 
 from . import views
 from .views import detalle_producto, lista_productos
 
 urlpatterns = [
+    # Panel de administrador de Django
+    path('admin/', admin.site.urls),
+    
+    # 1. TUS RUTAS PERSONALIZADAS TIENEN PRIORIDAD (El logout seguro)
+    path("logout/", views.logout_view, name="logout"),
+
+    # 2. RUTAS NATIVAS DE DJANGO (Se cargan después para no pisar las tuyas)
+    path('', include('django.contrib.auth.urls')),
+
+    # El resto de tus rutas normales
     path("", lista_productos, name="productos"),
     path("producto/<int:producto_id>/", detalle_producto, name="detalle_producto"),
     path("detalle/<int:producto_id>/", detalle_producto, name="detalle"),
@@ -18,7 +28,6 @@ urlpatterns = [
     ),
     path("dashboard/", views.dashboard_productos, name="dashboard"),
     path("editar/<int:producto_id>/", views.editar_producto, name="editar_producto"),
-    path("logout/", views.logout_view, name="logout"),
     path('exportar/', views.menu_exportar, name='menu_exportar'),
     path('generar-pdf/', views.generar_pdf, name='generar_pdf'),
 ]

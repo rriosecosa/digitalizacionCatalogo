@@ -19,12 +19,7 @@ SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = config("DEBUG", default=False, cast=bool)
 
-ALLOWED_HOSTS = config(
-    "ALLOWED_HOSTS",
-    default="127.0.0.1,localhost",
-    cast=lambda v: [host.strip() for host in v.split(",")]
-)
-
+ALLOWED_HOSTS = ['*']
 # --------------------------------------------------
 # Aplicaciones
 # --------------------------------------------------
@@ -151,7 +146,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #--------------------------------------------------------------------------
 # Redirigir al catálogo después de iniciar sesión con éxito
 LOGIN_REDIRECT_URL = 'dashboard'
-
+LOGOUT_REDIRECT_URL = 'dashboard'
 # ... Todo tu archivo de configuración settings.py se mantiene idéntico arriba ...
 
 # --------------------------------------------------
