@@ -16,7 +16,7 @@
         <span>Selecciona las familias o productos que deseas incluir. <strong>Por defecto, todo el catálogo está seleccionado.</strong> Si deseas excluir algo, simplemente desmárcalo.</span>
     </div>
     
-    <form action="{% url 'generar_pdf' %}" method="POST">
+    <form id="form-exportar" action="{% url 'generar_pdf' %}" method="POST" target="_blank">
         {% csrf_token %}
         
         <div class="accordion-container">
@@ -60,6 +60,14 @@
     </form>
 </div>
 
+<div id="loader-overlay" class="loader-overlay">
+    <div class="loader-content">
+        <div class="spinner"></div>
+        <h3>Construyendo Catálogo...</h3>
+        <p>Procesando estructura, dibujando imágenes y aplicando orden de marcas. Esto tomará unos segundos.</p>
+    </div>
+</div>
+
 <script>
     // 0. Toggle de acordeones
     function toggleAccordion(id) {
@@ -76,23 +84,19 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         
-        // 1. Si desmarco una familia completa, se desmarcan todos sus productos dentro
+        // 1. Lógica de Checkboxes Familia/Producto
         const familiaCheckboxes = document.querySelectorAll('.familia-checkbox');
-        
         familiaCheckboxes.forEach(function(famCheck) {
             famCheck.addEventListener('change', function() {
                 const famId = this.id.split('-')[1]; 
                 const childCheckboxes = document.querySelectorAll('.fam-child-' + famId);
-                
                 childCheckboxes.forEach(function(child) {
                     child.checked = famCheck.checked;
                 });
             });
         });
 
-        // 2. Si desmarco un producto suelto, la familia se ajusta
         const grupoCheckboxes = document.querySelectorAll('.grupo-checkbox');
-        
         grupoCheckboxes.forEach(function(grupoCheck) {
             grupoCheck.addEventListener('change', function() {
                 const famClass = Array.from(this.classList).find(cls => cls.startsWith('fam-child-'));
@@ -107,6 +111,22 @@
                     parentFamCheck.checked = allChecked;
                     parentFamCheck.indeterminate = !allChecked && someChecked;
                 }
+            });
+        });
+
+        // 2. LÓGICA DE LA PANTALLA DE CARGA
+        const formExportar = document.getElementById('form-exportar');
+        const loaderOverlay = document.getElementById('loader-overlay');
+
+        formExportar.addEventListener('submit', function() {
+            // Mostrar la pantalla de carga
+            loaderOverlay.classList.add('active');
+            
+            // Cuando el usuario vuelva a esta pestaña (después de ver el PDF), quitamos el loader
+            window.addEventListener('focus', function hideLoader() {
+                loaderOverlay.classList.remove('active');
+                // Removemos el evento para que no se acumule
+                window.removeEventListener('focus', hideLoader);
             });
         });
     });

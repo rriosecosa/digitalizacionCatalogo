@@ -1,173 +1,331 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Catálogo Ecosa</title>
+    <title>Catálogo Oficial Ecosa 2026</title>
     <style>
-        /* =========================================
-           REGLAS DE IMPRESIÓN (WeasyPrint)
-           ========================================= */
+        /* =========================================================
+           1. CONFIGURACIÓN DE PÁGINA (Optimización de ancho)
+           ========================================================= */
         @page {
-            size: A4;
-            margin: 1.5cm;
-            @bottom-center {
-                content: "Página " counter(page);
-                font-size: 10px;
-                color: #666;
+            size: letter;
+            margin: 15mm 10mm 15mm 10mm; /* Márgenes estándar para el contenido */
+            
+            @top-right {
+                content: "Catálogo de Productos 2026";
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 7.5pt;
+                color: #64748b;
+                border-bottom: 0.5px solid #e2e8f0;
+                padding-bottom: 3px;
+            }
+            @bottom-right {
+                content: "Pág. " counter(page);
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 7.5pt;
+                color: #64748b;
+            }
+            @bottom-left {
+                /* NUEVO: Agregamos la fecha de generación dinámica usando Django */
+                content: "Ecosa - Comercializadora e Importadora | Generado el {% now 'd/m/Y' %}";
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 7.5pt;
+                color: #64748b;
             }
         }
-        
-        /* Regla exclusiva para la primera hoja (La Portada) */
+
+        /* Remueve los márgenes por completo de la primera hoja para que la foto cubra el 100% */
         @page :first {
-            background-image: url('{{ request.scheme }}://{{ request.get_host }}/static/img/portada_catalogo.jpg');
-            background-size: cover;
-            background-position: center;
             margin: 0;
-            @bottom-center { content: ""; } /* Quita la numeración en la portada */
+            @top-right { content: normal; }
+            @bottom-right { content: normal; }
+            @bottom-left { content: normal; }
         }
 
-        /* =========================================
-           DISEÑO DEL CONTENIDO
-           ========================================= */
+        /* =========================================================
+           2. ESTILOS GENERALES
+           ========================================================= */
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #333;
-            font-size: 10px; /* Letra pequeña para optimizar espacio */
+            color: #1e293b;
+            margin: 0;
+            padding: 0;
+            font-size: 8.5pt;
+            line-height: 1.3;
         }
 
-        .salto-portada {
+        /* =========================================================
+           3. PORTADA CON TU IMAGEN COMPLETA
+           ========================================================= */
+        .portada-contenedor {
             page-break-after: always;
+            width: 100vw;
             height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
 
-        /* Bloque azul de Familia */
-        .titulo-familia {
-            background-color: #003366;
-            color: white;
-            padding: 8px;
-            font-size: 14px;
-            margin-top: 15px;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-
-        /* La Tarjeta del Producto */
-        .producto-grupo {
-            page-break-inside: avoid; /* REGLA VITAL: Evita que el producto se corte entre páginas */
-            margin-bottom: 15px;
-            border-bottom: 1px dashed #ccc;
-            padding-bottom: 10px;
-        }
-
-        .producto-titulo {
-            font-size: 13px;
-            color: #004080;
-            font-weight: bold;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-        }
-
-        /* Simulamos columnas con un contenedor table para compatibilidad absoluta en WeasyPrint */
-        .contenedor-detalle {
-            display: table;
+        .portada-img {
             width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
-        
-        .columna-imagen {
-            display: table-cell;
-            width: 25%;
+
+        /* =========================================================
+           NUEVO: ESTILOS DEL ÍNDICE AUTOMÁTICO
+           ========================================================= */
+        .indice-contenedor {
+            page-break-after: always; /* Asegura que el índice tenga su propia hoja */
+            padding: 10mm;
+        }
+
+        .titulo-indice {
+            font-size: 18pt;
+            color: #0f172a;
+            border-bottom: 4px solid #e11d48;
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+        }
+
+        .lista-indice {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .lista-indice li {
+            font-size: 10pt;
+            margin-bottom: 12px;
+        }
+
+        .lista-indice a {
+            text-decoration: none;
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        /* La magia de WeasyPrint: dibuja puntos hasta el número de página detectado */
+        .lista-indice a::after {
+            content: leader('.') target-counter(attr(href), page);
+            font-weight: normal;
+            color: #64748b;
+        }
+
+        /* =========================================================
+           4. SECCIONES Y CATEGORÍAS
+           ========================================================= */
+        .seccion-familia {
+            page-break-before: always;
+        }
+
+        .titulo-familia {
+            background-color: #0f172a;
+            color: white;
+            padding: 10px 15px;
+            font-size: 14pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #e11d48;
+        }
+
+        /* =========================================================
+           5. REJILLA GRID DE TRES COLUMNAS (3x3)
+           ========================================================= */
+        .grid-productos {
+            display: block;
+            font-size: 0;
+            margin: 0 -1%;
+        }
+
+        .producto-tarjeta {
+            display: inline-block;
             vertical-align: top;
+            width: 31.3%;
+            margin: 0 1% 20px 1%;
+            box-sizing: border-box;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 8.5pt;
+            page-break-inside: avoid;
+        }
+
+        /* =========================================================
+           6. CONTENIDO DE LA TARJETA
+           ========================================================= */
+        .contenedor-imagen {
             text-align: center;
+            margin-bottom: 8px;
+            background: #f8fafc;
+            padding: 6px;
+            border-radius: 4px;
+            height: 105px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .columna-tabla {
-            display: table-cell;
-            width: 75%;
-            vertical-align: top;
-            padding-left: 15px;
-        }
-
-        .producto-imagen {
-            max-width: 100%;
-            max-height: 100px; /* Altura restringida para asegurar +6 por página */
+        .grupo-img {
+            max-width: 90px;
+            max-height: 90px;
             object-fit: contain;
         }
 
-        /* Tabla de variantes */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 5px;
+        .no-img-placeholder {
+            font-size: 7pt;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-weight: 600;
         }
 
-        th, td {
-            border: 1px solid #ddd;
-            padding: 4px;
+        .info-detalles {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .grupo-titulo {
+            font-size: 7.5pt;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+            color: #0f172a;
+            line-height: 1.2;
+            height: 22px;
+            overflow: hidden;
+        }
+
+        .grupo-meta-desc {
+            font-size: 6.5pt;
+            color: #64748b;
+            margin: 0;
+            line-height: 1.3;
+            height: 26px;
+            overflow: hidden;
+        }
+
+        /* =========================================================
+           7. TABLA DE VARIANTES
+           ========================================================= */
+        .tabla-variantes {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+        }
+
+        .tabla-variantes th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 700;
+            font-size: 5.5pt;
+            text-transform: uppercase;
+            padding: 3px 4px;
+            border-bottom: 1px solid #cbd5e1;
             text-align: left;
         }
 
-        th {
-            background-color: #f1f5f9;
-            font-weight: bold;
-            color: #333;
+        .tabla-variantes td {
+            font-size: 5.5pt;
+            padding: 4px 4px;
+            border-bottom: 0.5px solid #f1f5f9;
+            color: #334155;
+        }
+
+        .tabla-variantes tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .col-codigo {
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .col-desc {
+            color: #64748b;
+        }
+
+        .col-precio {
+            text-align: right;
+            font-weight: 700;
+            color: #e11d48;
         }
     </style>
 </head>
 <body>
 
-    <div class="salto-portada">
-        </div>
+    <div class="portada-contenedor">
+        <img src="{% static 'img/portada_catalogo.png' %}" class="portada-img" alt="Portada Oficial Ecosa">
+    </div>
+
+    <div class="indice-contenedor">
+        <h1 class="titulo-indice">Índice del Catálogo</h1>
+        <ul class="lista-indice">
+            {% for familia, grupos in catalogo.items %}
+                <li>
+                    <a href="#familia-{{ forloop.counter }}">{{ familia }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
 
     {% for familia, grupos in catalogo.items %}
+    
+    <div class="seccion-familia" id="familia-{{ forloop.counter }}">
+        
         <div class="titulo-familia">{{ familia }}</div>
-
-        {% for nombre_grupo, datos in grupos.items %}
-            <div class="producto-grupo">
-                <div class="producto-titulo">{{ nombre_grupo }}</div>
+        
+        <div class="grid-productos">
+            {% for grupo_nombre, info in grupos.items %}
+            <div class="producto-tarjeta">
                 
-                <div class="contenedor-detalle">
-                    <div class="columna-imagen">
-                        {% if datos.imagen_url %}
-                            <img src="{{ request.scheme }}://{{ request.get_host }}{{ datos.imagen_url }}" class="producto-imagen" alt="Imagen del producto">
-                        {% else %}
-                            <div style="color:#aaa; font-style:italic; padding-top:20px;">Sin imagen</div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="columna-tabla">
-                        {% if datos.descripcion %}
-                            <div style="margin-bottom:5px; font-style:italic; color:#555;">{{ datos.descripcion }}</div>
-                        {% endif %}
-                        
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width:25%;">Código Interno</th>
-                                    <th style="width:55%;">Descripción de Medida</th>
-                                    <th style="width:20%;">Precio Base</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for p in datos.variantes %}
-                                <tr>
-                                    <td>{{ p.codigo }}</td>
-                                    <td>{{ p.descripcion }}</td>
-                                    <td>
-                                        {% if p.precio_base_pesos %}
-                                            ${{ p.precio_base_pesos|floatformat:0 }}
-                                        {% else %}
-                                            Consultar
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="contenedor-imagen">
+                    {% if info.imagen_url %}
+                        <img src="{{ info.imagen_url }}" class="grupo-img" alt="Imagen {{ grupo_nombre }}">
+                    {% else %}
+                        <div class="no-img-placeholder">Sin Imagen</div>
+                    {% endif %}
                 </div>
+
+                <div class="info-detalles">
+                    <h2 class="grupo-titulo" title="{{ grupo_nombre }}">{{ grupo_nombre }}</h2>
+                    {% if info.descripcion %}
+                        <p class="grupo-meta-desc">{{ info.descripcion }}</p>
+                    {% endif %}
+                </div>
+
+                <table class="tabla-variantes">
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Código</th>
+                            <th style="width: 40%;">Detalle</th>
+                            <th style="width: 25%; text-align: right;">Precio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for var in info.variantes %}
+                        <tr>
+                            <td class="col-codigo">{{ var.codigo|default:"---" }}</td>
+                            <td class="col-desc">{{ var.descripcion|default:"Estándar" }}</td>
+                            <td class="col-precio">
+                                {% if var.precio_base_pesos %}
+                                    ${{ var.precio_base_pesos|floatformat:0 }}
+                                {% else %}
+                                    ---
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
             </div>
-        {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
     {% endfor %}
 
 </body>

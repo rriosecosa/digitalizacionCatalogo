@@ -19,7 +19,7 @@ urlpatterns = [
     path("dashboard/", views.dashboard_productos, name="dashboard"),
     path("editar/<int:producto_id>/", views.editar_producto, name="editar_producto"),
     path("logout/", views.logout_view, name="logout"),
-    path('exportar/', views.menu_exportar_pdf, name='menu_exportar'),
+    path('exportar/', views.menu_exportar, name='menu_exportar'),
     path('generar-pdf/', views.generar_pdf, name='generar_pdf'),
 ]
 
