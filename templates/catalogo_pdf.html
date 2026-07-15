@@ -300,9 +300,10 @@
                 <table class="tabla-variantes">
                     <thead>
                         <tr>
-                            <th style="width: 35%;">Código</th>
-                            <th style="width: 40%;">Detalle</th>
-                            <th style="width: 25%; text-align: right;">Precio</th>
+                            <th style="width: 28%;">Código</th>
+                            <th style="width: 34%;">Detalle</th>
+                            <th style="width: 16%;">Unidad</th>
+                            <th style="width: 22%; text-align: right;">Precio</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -310,6 +311,7 @@
                         <tr>
                             <td class="col-codigo">{{ var.codigo|default:"---" }}</td>
                             <td class="col-desc">{{ var.descripcion|default:"Estándar" }}</td>
+                            <td class="col-desc">{{ var.unidad_medida|default:"-" }}</td>
                             <td class="col-precio">
                                 {% if var.precio_base_pesos %}
                                     ${{ var.precio_base_pesos|floatformat:0 }}

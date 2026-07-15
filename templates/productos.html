@@ -5,6 +5,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Catálogo de Productos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/productos.css' %}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
@@ -32,9 +35,28 @@
     </div>
 </header>
 
+<div class="barra-movil-filtros">
+    <button type="button" class="btn-filtros-movil" id="btnFiltros">
+        <i class="bi bi-sliders"></i>
+        <span>Filtros</span>
+        {% if familia_actual or marca_actual or busqueda %}
+            <span class="punto-activo"></span>
+        {% endif %}
+    </button>
+</div>
+
+<div class="overlay-filtros" id="overlayFiltros"></div>
+
 <div class="layout">
 
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebarFiltros">
+
+        <div class="sidebar-header-movil">
+            <span>Filtros</span>
+            <button type="button" class="cerrar-filtros" id="cerrarFiltros" aria-label="Cerrar filtros">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
 
         <div class="bloque-filtro">
             <h2>Buscar</h2>
@@ -167,11 +189,11 @@
                             {% endif %}
                             
                             {% if grupo.descripcion_grupo %}
-                                <p class="desc-grupo" style="font-size: 0.85rem; color: #64748b; margin: 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">
+                                <p class="desc-grupo">
                                     {{ grupo.descripcion_grupo }}
                                 </p>
                             {% elif grupo.cantidad == 1 and grupo.productos.0.descripcion %}
-                                <p class="desc-grupo" style="font-size: 0.85rem; color: #64748b; margin: 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">
+                                <p class="desc-grupo">
                                     {{ grupo.productos.0.descripcion }}
                                 </p>
                             {% endif %}
@@ -181,7 +203,7 @@
                                     Ver {{ grupo.cantidad }} variantes
                                 </a>
                             {% else %}
-                                <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle" style="background-color: #f1f5f9; color: #3b82f6; border: 1px solid #cbd5e1;">
+                                <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle secundario">
                                     Ver detalle
                                 </a>
                             {% endif %}
@@ -195,11 +217,16 @@
                                         Consultar precio
                                     {% endif %}
                                 </div>
-                                {% if grupo.cantidad == 1 %}
-                                    <span class="variantes-count">
+                                <div class="variantes-count">
+                                    {% if grupo.cantidad == 1 %}
                                         {{ grupo.productos.0.codigo }}
-                                    </span>
-                                {% endif %}
+                                    {% endif %}
+                                    {% if grupo.unidad_medida %}
+                                        <span class="unidad-medida" style="margin-left: 5px; font-weight: bold; color: #666;">
+                                            | {{ grupo.unidad_medida }}
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </div>
 
                         </div>
@@ -240,6 +267,31 @@
     </main>
 
 </div>
+
+<script>
+(function () {
+    const btnFiltros = document.getElementById('btnFiltros');
+    const sidebar = document.getElementById('sidebarFiltros');
+    const overlay = document.getElementById('overlayFiltros');
+    const cerrar = document.getElementById('cerrarFiltros');
+
+    function abrirFiltros() {
+        sidebar.classList.add('sidebar-abierta');
+        overlay.classList.add('activo');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function cerrarFiltros() {
+        sidebar.classList.remove('sidebar-abierta');
+        overlay.classList.remove('activo');
+        document.body.style.overflow = '';
+    }
+
+    if (btnFiltros) btnFiltros.addEventListener('click', abrirFiltros);
+    if (overlay) overlay.addEventListener('click', cerrarFiltros);
+    if (cerrar) cerrar.addEventListener('click', cerrarFiltros);
+})();
+</script>
 
 </body>
 </html>

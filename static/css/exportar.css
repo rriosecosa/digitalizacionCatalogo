@@ -1,16 +1,20 @@
 :root {
-    --color-primario: #0f172a;
-    --color-primario-claro: #3b82f6;
-    --color-fondo: #f8fafc;
-    --color-borde: #e2e8f0;
-    --color-texto: #1e293b;
-    --color-texto-suave: #64748b;
-    --color-danger: #e11d48;
-    --color-danger-hover: #be123c;
+    --color-primario: #0B5D3E;
+    --color-primario-oscuro: #073F2A;
+    --color-primario-claro: #1F9D6E;
+    --color-primario-tint: #E7F4EE;
+    --color-fondo: #F6F9F7;
+    --color-borde: #E1E9E4;
+    --color-texto: #172420;
+    --color-texto-suave: #5C6E66;
+    --color-danger: #DC2626;
+    --color-danger-hover: #B91C1C;
     --radio: 12px;
     --radio-sm: 8px;
-    --sombra: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --sombra: 0 4px 6px -1px rgba(7,63,42,0.05), 0 2px 4px -2px rgba(7,63,42,0.05);
+    --sombra-hover: 0 10px 15px -3px rgba(7,63,42,0.1), 0 4px 6px -2px rgba(7,63,42,0.05);
     --transicion: all 0.2s ease;
+    --anillo-foco: 0 0 0 3px rgba(31, 157, 110, 0.18);
 }
 
 body {
@@ -21,6 +25,10 @@ body {
     color: var(--color-texto);
 }
 
+h2, h3 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
 .export-container {
     max-width: 1100px;
     margin: 0 auto;
@@ -29,6 +37,7 @@ body {
     border-radius: var(--radio);
     box-shadow: var(--sombra);
     border: 1px solid var(--color-borde);
+    border-top: 3px solid var(--color-primario);
 }
 
 .export-header {
@@ -42,9 +51,11 @@ body {
 
 .export-header h2 {
     margin: 0;
-    color: var(--color-primario);
+    color: var(--color-primario-oscuro);
     font-size: 1.6rem;
     font-weight: 800;
+    padding-left: 14px;
+    border-left: 5px solid var(--color-primario-claro);
 }
 
 .btn-volver {
@@ -61,17 +72,18 @@ body {
     transition: var(--transicion);
 }
 .btn-volver:hover {
-    background: #f1f5f9;
-    color: var(--color-texto);
+    background: var(--color-primario-tint);
+    border-color: var(--color-primario-claro);
+    color: var(--color-primario-oscuro);
 }
 
 .export-alert {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    background: #eff6ff;
-    color: #1e40af;
-    border: 1px solid #bfdbfe;
+    background: var(--color-primario-tint);
+    color: var(--color-primario-oscuro);
+    border: 1px solid #c3e2d3;
     padding: 16px 20px;
     border-radius: var(--radio-sm);
     margin-bottom: 30px;
@@ -93,12 +105,16 @@ body {
     border-radius: var(--radio-sm);
     background: #fff;
     overflow: hidden;
+    transition: var(--transicion);
+}
+.accordion-item:hover {
+    border-color: #c3ddd0;
 }
 
 .accordion-title-bar {
     display: flex;
     align-items: center;
-    background: #f8fafc;
+    background: var(--color-fondo);
     padding: 12px 20px;
     border-bottom: 1px solid var(--color-borde);
 }
@@ -123,8 +139,8 @@ body {
 }
 
 .fam-badge {
-    background: #e2e8f0;
-    color: var(--color-texto-suave);
+    background: var(--color-primario-tint);
+    color: var(--color-primario-oscuro);
     font-size: 0.75rem;
     font-weight: 700;
     padding: 4px 10px;
@@ -162,7 +178,7 @@ body {
     transition: background 0.2s;
 }
 .grupo-label:hover {
-    background: #f1f5f9;
+    background: var(--color-primario-tint);
 }
 .grupo-name {
     font-size: 0.85rem;
@@ -240,7 +256,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--color-danger);
+    background: var(--color-primario);
     color: white;
     border: none;
     padding: 14px 28px;
@@ -249,12 +265,12 @@ body {
     font-weight: 700;
     cursor: pointer;
     transition: var(--transicion);
-    box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.4);
+    box-shadow: 0 4px 6px -1px rgba(11, 93, 62, 0.35);
 }
 .btn-generar:hover {
-    background: var(--color-danger-hover);
+    background: var(--color-primario-oscuro);
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px -2px rgba(225, 29, 72, 0.5);
+    box-shadow: 0 6px 12px -2px rgba(11, 93, 62, 0.4);
 }
 .btn-generar:active { transform: translateY(0); }
 
@@ -310,7 +326,7 @@ body {
 .spinner {
     width: 55px; height: 55px;
     border: 5px solid #e2e8f0; /* Color gris de fondo */
-    border-top-color: var(--color-danger); /* Color rojo principal */
+    border-top-color: var(--color-primario-claro); /* Verde de marca */
     border-radius: 50%;
     animation: girar 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
     margin: 0 auto;

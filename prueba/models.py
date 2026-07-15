@@ -1,9 +1,7 @@
 from django.db import models
 
-
 class Producto(models.Model):
     field_id = models.AutoField(db_column="_id", primary_key=True)
-
     codigo = models.TextField(blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True)
 
@@ -19,7 +17,7 @@ class Producto(models.Model):
     precio_base_pesos = models.FloatField(blank=True, null=True)
     stock_disponible = models.FloatField(blank=True, null=True)
     eliminado = models.FloatField(blank=True, null=True)
-    
+
     @property
     def familia(self):
         if not self.codigo:
@@ -60,16 +58,17 @@ class FamiliaProducto(models.Model):
 
 
 # =====================================================================
-# NUEVO MODELO ASOCIADO A LA VISTA DE NEON (POSTGRESQL)
+# VISTA SQL (Se acelera automáticamente con los índices de 'producto' y 'proveedor')
 # =====================================================================
 class VistaProductoAgrupado(models.Model):
-    id = models.IntegerField(primary_key=True)  # Mapea al _id original del producto
+    id = models.IntegerField(primary_key=True) 
     codigo = models.TextField(blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True)
     precio_base_pesos = models.FloatField(blank=True, null=True)
     stock_disponible = models.FloatField(blank=True, null=True)
     eliminado = models.FloatField(blank=True, null=True)
-    
+    unidad_medida = models.TextField(blank=True, null=True)
+
     proveedor = models.ForeignKey(
         "Proveedor",
         db_column="proveedor",
@@ -78,8 +77,7 @@ class VistaProductoAgrupado(models.Model):
         null=True,
         related_name="productos_agrupados",
     )
-    
-    # Campo calculado dinámicamente mediante las Regex de Postgres en Neon
+
     descripcion_grupo = models.TextField()
 
     @property
@@ -92,22 +90,57 @@ class VistaProductoAgrupado(models.Model):
         return FamiliaProducto.objects.filter(codigo=partes[1]).first()
 
     class Meta:
-        managed = False  # Django ignorará las migraciones para este modelo
+        managed = False 
         db_table = "vista_producto_agrupado"
 
 
 # =====================================================================
-# NUEVA FUNCIONALIDAD: MODELO PARA ALMACENAR IMÁGENES Y DESCRIPCIONES
+# MODELOS ADMINISTRADOS POR DJANGO
 # =====================================================================
 class ImagenProducto(models.Model):
+    # db_index=True es vital aquí y ya lo tienes configurado correctamente.
     grupo_nombre = models.CharField(max_length=255, unique=True, db_index=True)
     imagen = models.ImageField(upload_to='productos/')
-    
-    # --- NUEVO CAMPO AÑADIDO: DESCRIPCIÓN DEL PRODUCTO ---
     descripcion = models.TextField(blank=True, null=True)
-    # -----------------------------------------------------
-    
     creado_el = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Datos para {self.grupo_nombre}"
+
+
+class CatalogCache(models.Model):
+    version_number = models.IntegerField()
+    pdf_file = models.FileField(upload_to='catalogos/')
+    generated_at = models.DateTimeField(auto_now_add=True)
+    is_current = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = 'prueba_catalogcache'
+        ordering = ['-version_number']
+
+    def __str__(self):
+        return f"Catálogo v{self.version_number} - {'Actual' if self.is_current else 'Anterior'}"
+    
+from django.db import models
+import os
+
+class HistorialCatalogo(models.Model):
+    nombre = models.CharField(max_length=200, verbose_name="Nombre del Catálogo")
+    archivo_pdf = models.FileField(upload_to='catalogos_pdf/', verbose_name="Archivo PDF")
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+
+    class Meta:
+        verbose_name = "Historial de Catálogo"
+        verbose_name_plural = "Historial de Catálogos"
+        # Ordenamos por defecto del más antiguo al más nuevo
+        ordering = ['fecha_creacion']
+
+    def __str__(self):
+        return f"{self.nombre} - {self.fecha_creacion.strftime('%d/%m/%Y %H:%M')}"
+
+    # Opcional pero recomendado: Borrar el archivo físico cuando se borra el registro de la BD
+    def delete(self, *args, **kwargs):
+        if self.archivo_pdf and os.path.isfile(self.archivo_pdf.path):
+            os.remove(self.archivo_pdf.path)
+        super().delete(*args, **kwargs)

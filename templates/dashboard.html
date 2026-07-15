@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Gestión de Catálogo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 </head>
 <body>
@@ -16,27 +19,42 @@
             <h1>Panel de Control</h1>
             <p class="subtitle">Gestión de Catálogo e Inventario</p>
         </div>
-        <div class="header-actions">
+        
+        <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
             
-            {% if request.user.is_superuser %}
-            <a href="{% url 'menu_exportar' %}" class="btn-export-pdf">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Generar Catalogo PDF
-            </a>
-            {% endif %}
-            
-            <a href="{% url 'productos' %}" class="btn-link">
+            <a href="{% url 'productos' %}" class="btn-link btn-primario">
                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                Ver Catálogo Público
+                Catálogo Público
             </a>
 
-            <form action="{% url 'logout' %}" method="post" style="display: inline;">
+            <div class="dropdown">
+                <button type="button" class="dropdown-toggle">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Gestión PDF
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-left: 4px;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div class="dropdown-menu">
+                    {% if request.user.is_superuser %}
+                    <a href="{% url 'menu_exportar' %}" class="dropdown-item">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                        Generar Catálogo PDF
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'descargar_catalogo' %}" class="dropdown-item text-success">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar Vigente
+                    </a>
+                    <a href="{% url 'historial_catalogo' %}" class="dropdown-item">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Ver Historial
+                    </a>
+                </div>
+            </div>
+
+            <form action="{% url 'logout' %}" method="post" style="display: inline; margin-left: 4px;">
                 {% csrf_token %}
-                <button type="submit" class="btn-logout" style="background: none; border: none; padding: 0; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                    </svg>
-                    Cerrar Sesión
+                <button type="submit" class="btn-logout-icon" title="Cerrar Sesión">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 </button>
             </form>
         </div>
@@ -51,6 +69,7 @@
         {% endfor %}
     {% endif %}
 
+    {% if request.user.is_superuser %}
     <section class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-icon">
@@ -85,6 +104,7 @@
             <span class="subtexto">Últimos 6 meses</span>
         </div>
     </section>
+    {% endif %}
 
     <div class="barra-herramientas">
         <form class="form-busqueda" method="get" action="">
@@ -109,7 +129,10 @@
                     <th>Descripción Pública</th>
                     <th>Datos Base</th>
                     <th>Inventario ($ / Unds)</th>
+                    <th>Unidad</th>
+                    {% if request.user.is_superuser %}
                     <th>Acciones</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -148,6 +171,11 @@
                         <div class="resumen-texto">{{ prod.stock_disponible|default:'0' }} Unds</div>
                     </td>
 
+                    <td data-label="Unidad">
+                        <div class="resumen-texto">{{ prod.unidad_medida|default:"-" }}</div>
+                    </td>
+
+                    {% if request.user.is_superuser %}
                     <td data-label="Acciones">
                         <button type="button" class="btn-modificar" onclick="abrirModal('modal-{{ prod.field_id }}')">
                             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
@@ -201,10 +229,11 @@
                             </div>
                         </div>
                     </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="empty-state">
+                    <td colspan="{% if request.user.is_superuser %}7{% else %}6{% endif %}" class="empty-state">
                         <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                         <p>No se encontraron productos para modificar en esta selección.</p>
                     </td>

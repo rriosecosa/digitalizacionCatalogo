@@ -1,0 +1,189 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Catálogos - Gestión de Catálogo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/historial.css' %}">
+    
+    
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-book-open me-2"></i>ECOSA</h3>
+            <button class="btn btn-link text-white d-md-none" id="closeSidebar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="sidebar-user">
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="user-info">
+                <p class="user-name">{{ request.user.username }}</p>
+                <p class="user-role">
+                    {% if request.user.is_superuser %}Administrador{% else %}Vendedor{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li class="nav-item">
+                <a href="{% url 'dashboard' %}" class="nav-link">
+                    <i class="fas fa-home nav-icon"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'productos' %}" class="nav-link">
+                    <i class="fas fa-box nav-icon"></i> Catálogo Público
+                </a>
+            </li>
+            
+            {% if request.user.is_superuser %}
+            <li class="nav-item">
+                <a href="{% url 'menu_exportar' %}" class="nav-link">
+                    <i class="fas fa-file-pdf nav-icon"></i> Generar Catálogo
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="nav-item">
+                <a href="{% url 'historial_catalogo' %}" class="nav-link active">
+                    <i class="fas fa-history nav-icon"></i> Historial de Versiones
+                </a>
+            </li>
+            
+            <li class="nav-item mt-4">
+                <form action="{% url 'logout' %}" method="post" class="m-0 p-0">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link text-danger w-100 text-start border-0 bg-transparent">
+                        <i class="fas fa-sign-out-alt nav-icon"></i> Cerrar Sesión
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-content" id="mainContent">
+        <div class="topbar d-md-none">
+            <button class="btn btn-link text-dark" id="openSidebar">
+                <i class="fas fa-bars fa-lg"></i>
+            </button>
+            <h5 class="m-0 fw-bold">Historial de Catálogos</h5>
+        </div>
+
+        <div class="container-fluid py-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="h3 mb-0 text-gray-800">Historial de Versiones</h2>
+                    <p class="text-muted mb-0">Descargas y control de espacio en disco</p>
+                </div>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Versión</th>
+                                    <th>Fecha de Creación</th>
+                                    <th>Nombre de Archivo</th>
+                                    <th>Estado</th>
+                                    <th class="text-end pe-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in historial %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <strong>Versión {{ cat.version_number }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ cat.generated_at|date:"d-m-Y H:i"|default:"---" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary rounded-pill text-truncate" style="max-width: 200px;">
+                                            <i class="fas fa-file-pdf me-1"></i> {{ cat.pdf_file.name }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if cat.is_current %}
+                                            <span class="badge bg-success">Vigente</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Antiguo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'descargar_catalogo_version' cat.id %}" class="btn btn-sm btn-outline-primary" title="Descargar PDF">
+                                                <i class="fas fa-download"></i> Descargar
+                                            </a>
+
+                                            {% if request.user.is_superuser %}
+                                            <form action="{% url 'eliminar_catalogo' cat.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás completamente seguro de que deseas eliminar la Versión {{ cat.version_number }} del catálogo?\n\nEsta acción eliminará el archivo PDF del disco del servidor de forma permanente y NO se puede deshacer.');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar Archivo Físico">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fas fa-folder-open fa-3x mb-3 opacity-50"></i>
+                                        <p class="mb-0">No se han generado versiones históricas del catálogo en este sistema.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const openBtn = document.getElementById('openSidebar');
+            const closeBtn = document.getElementById('closeSidebar');
+
+            if (openBtn) {
+                openBtn.addEventListener('click', function() {
+                    sidebar.classList.add('show');
+                    mainContent.classList.add('sidebar-open');
+                });
+            }
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function() {
+                    sidebar.classList.remove('show');
+                    mainContent.classList.remove('sidebar-open');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
