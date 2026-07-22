@@ -11,6 +11,7 @@ from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
 from django.db.models import Case, When, Value, IntegerField, Q
 from django.core.exceptions import PermissionDenied
+from django.urls import reverse
 
 import weasyprint
 from weasyprint import HTML
@@ -32,7 +33,19 @@ def lista_productos(request):
     productos = (
         VistaProductoAgrupado.objects
         .select_related("proveedor")
-        .exclude(descripcion__startswith="***")
+        .exclude(
+            Q(descripcion__isnull=True) | 
+            Q(descripcion__exact='') | 
+            Q(descripcion__startswith='*') | 
+            Q(descripcion__startswith='(') |
+            Q(descripcion__istartswith='tee') |
+            Q(descripcion__regex=r'^.$') |
+            Q(proveedor__marca__startswith='*') |
+            Q(proveedor__marca__startswith='"') |
+            Q(proveedor__marca__iexact='a') |
+            Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+            Q(proveedor__marca__iexact='HELA')
+        )
     )
 
     if marca_seleccionada:
@@ -161,7 +174,19 @@ def detalle_producto(request, producto_id):
                 imagen_url = info_grupo.imagen
 
     # 3. OPTIMIZACIÓN: Dejamos de iterar sobre TODOS los productos. PostgreSQL hace la búsqueda.
-    variantes = VistaProductoAgrupado.objects.select_related("proveedor").exclude(descripcion__startswith="***").filter(
+    variantes = VistaProductoAgrupado.objects.select_related("proveedor").exclude(
+        Q(descripcion__isnull=True) | 
+        Q(descripcion__exact='') | 
+        Q(descripcion__startswith='*') | 
+        Q(descripcion__startswith='(') |
+        Q(descripcion__istartswith='tee') |
+        Q(descripcion__regex=r'^.$') |
+        Q(proveedor__marca__startswith='*') |
+        Q(proveedor__marca__startswith='"') |
+        Q(proveedor__marca__iexact='a') |
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(proveedor__marca__iexact='HELA')
+    ).filter(
         Q(descripcion_grupo=nombre_grupo) | 
         Q(descripcion=nombre_grupo, descripcion_grupo__isnull=True) | 
         Q(descripcion=nombre_grupo, descripcion_grupo=""),
@@ -188,14 +213,25 @@ def detalle_producto(request, producto_id):
 @login_required(login_url='/login/')
 def dashboard_productos(request):
     texto_busqueda = request.GET.get("q", "").strip()
-    productos_base_qs = VistaProductoAgrupado.objects.exclude(descripcion__startswith="***")
+    productos_base_qs = VistaProductoAgrupado.objects.exclude(
+        Q(descripcion__isnull=True) | 
+        Q(descripcion__exact='') | 
+        Q(descripcion__startswith='*') | 
+        Q(descripcion__startswith='(') |
+        Q(descripcion__istartswith='tee') |
+        Q(descripcion__regex=r'^.$') |
+        Q(proveedor__marca__startswith='*') |
+        Q(proveedor__marca__startswith='"') |
+        Q(proveedor__marca__iexact='a') |
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(proveedor__marca__iexact='HELA')
+    )
 
     kpi_productos_activos = productos_base_qs.count()
     kpi_familias_activas = FamiliaProducto.objects.count()
     kpi_proveedores = productos_base_qs.values("proveedor__marca").distinct().exclude(proveedor__marca="").count()
 
     hace_seis_meses = datetime.now() - timedelta(days=180)
-    # Manejo robusto de la fecha (evita errores si el campo no existe)
     try:
         kpi_nuevos_6_meses = productos_base_qs.filter(fecha_creacion__gte=hace_seis_meses).count()
     except Exception:
@@ -204,14 +240,13 @@ def dashboard_productos(request):
     productos_qs = productos_base_qs.select_related("proveedor").order_by("descripcion")
 
     if texto_busqueda:
-        # 4. OPTIMIZACIÓN: Removida la lista por comprensión de Python. Todo se hace en SQL.
         productos_qs = productos_qs.filter(
             Q(descripcion__icontains=texto_busqueda) |
             Q(codigo__icontains=texto_busqueda) |
             Q(proveedor__marca__icontains=texto_busqueda)
         )
 
-    # 5. OPTIMIZACIÓN CRÍTICA: Paginamos ANTES de extraer atributos, así solo procesamos 20 a la vez.
+    # Paginamos ANTES de extraer atributos, así solo procesamos 20 a la vez.
     paginator = Paginator(productos_qs, 20)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
@@ -246,9 +281,8 @@ def dashboard_productos(request):
 
 
 # ==========================================
-# VISTAS RESTANTES (SIN CAMBIOS ESTRUCTURALES FUERTES YA QUE SON PROCESOS BACKGROUND/ADMIN)
+# VISTA: ACCIÓN EDITAR PRODUCTO (CON RETORNO DE PÁGINA SEGURO)
 # ==========================================
-
 @permission_required('prueba.change_producto', login_url='login')
 def editar_producto(request, producto_id):
     if request.method == "POST":
@@ -257,6 +291,9 @@ def editar_producto(request, producto_id):
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
         grupo_nombre = request.POST.get("grupo_nombre")
         descripcion_grupo = request.POST.get("descripcion_grupo")
+        
+        # CAPTURAMOS LA RUTA COMPLETA DE RETORNO O EL REFERER
+        next_url = request.POST.get("next") or request.META.get('HTTP_REFERER') or reverse('dashboard')
 
         try:
             precio_float = float(precio) if precio else None
@@ -279,6 +316,9 @@ def editar_producto(request, producto_id):
         except ValueError:
             messages.error(request, "Error: Los valores ingresados no son numéricos válidos.")
 
+        # REDIRECCIÓN EXACTA AL PUNTO DE ORIGEN
+        return redirect(next_url)
+
     return redirect('dashboard')
 
 
@@ -296,7 +336,20 @@ def es_admin(user):
 @login_required(login_url='/login/')
 @user_passes_test(es_admin)
 def menu_exportar(request):
-    productos = VistaProductoAgrupado.objects.exclude(descripcion__startswith="***").order_by('descripcion_grupo')
+    productos = VistaProductoAgrupado.objects.exclude(
+        Q(descripcion__isnull=True) | 
+        Q(descripcion__exact='') | 
+        Q(descripcion__startswith='*') | 
+        Q(descripcion__startswith='(') |
+        Q(descripcion__istartswith='tee') |
+        Q(descripcion__regex=r'^.$') |
+        Q(proveedor__marca__startswith='*') |
+        Q(proveedor__marca__startswith='"') |
+        Q(proveedor__marca__iexact='a') |
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(proveedor__marca__iexact='HELA')
+    ).order_by('descripcion_grupo')
+    
     familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
     arbol_familias = {}
 
@@ -316,15 +369,11 @@ def menu_exportar(request):
         arbol_familias[f] = sorted(list(arbol_familias[f]))
 
     arbol_familias = dict(sorted(arbol_familias.items()))
-    
-    # -------------------------------------------------------------
-    # NUEVO: Obtenemos la cantidad de catálogos para la advertencia
-    # -------------------------------------------------------------
     cantidad_catalogos = CatalogCache.objects.count()
 
     return render(request, 'exportar.html', {
         'arbol_familias': arbol_familias,
-        'cantidad_catalogos': cantidad_catalogos # Enviado al HTML
+        'cantidad_catalogos': cantidad_catalogos
     })
 
 
@@ -377,7 +426,7 @@ def generar_pdf(request):
 
             if grupo not in catalogo[familia]:
                 catalogo[familia][grupo] = {
-                    'imagen_url': imagenes_dict.get(grupo, None),
+                    'imagen_url': images_dict.get(grupo, None),
                     'descripcion': descripciones_dict.get(grupo, ""),
                     'variantes': []
                 }
@@ -395,19 +444,13 @@ def generar_pdf(request):
         fecha_actual = datetime.now().strftime('%d-%m-%Y')
         nombre_archivo = f"Catalogo_Ecosa_{fecha_actual}.pdf"
 
-        # -------------------------------------------------------------
-        # NUEVO: LÓGICA DE CONTROL DE ESPACIO (MÁXIMO 3 CATÁLOGOS)
-        # -------------------------------------------------------------
         catalogos_existentes = CatalogCache.objects.all().order_by('version_number')
         if catalogos_existentes.count() >= 3:
             catalogo_mas_antiguo = catalogos_existentes.first()
-            # Eliminar archivo físico
             if catalogo_mas_antiguo.pdf_file:
                 catalogo_mas_antiguo.pdf_file.delete(save=False)
-            # Eliminar el registro de la base de datos
             catalogo_mas_antiguo.delete()
             messages.warning(request, "Se ha eliminado el catálogo más antiguo para liberar espacio.")
-        # -------------------------------------------------------------
 
         ultima_version = CatalogCache.objects.order_by('-version_number').first()
         siguiente_version = (ultima_version.version_number + 1) if ultima_version else 1
@@ -474,4 +517,4 @@ def eliminar_catalogo(request, catalogo_id):
 
     catalogo.delete()
     messages.success(request, f"La versión {catalogo.version_number} del catálogo y su archivo PDF fueron eliminados para liberar espacio.")
-    return redirect('historial_catalogo') 
+    return redirect('historial_catalogo')
