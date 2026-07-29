@@ -1,0 +1,253 @@
+/* Importamos una fuente más moderna y limpia */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', "Segoe UI", Roboto, sans-serif;
+    background-color: #f4f6f9;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-wrapper {
+    width: 100%;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Contenedor principal de dos columnas */
+.login-container {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    display: flex;
+    width: 100%;
+    max-width: 850px; /* Ancho ajustado para verse profesional */
+    min-height: 500px;
+    overflow: hidden;
+}
+
+/* === LADO IZQUIERDO (BRANDING) === */
+.login-left {
+    flex: 1;
+    /* Aplicamos tus colores: #1C960C y #27E757 */
+    background: linear-gradient(135deg, #146908 0%, #27E757 100%);
+    color: white;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.brand-content {
+    position: relative;
+    z-index: 2;
+}
+
+.logo-icon {
+    font-size: 3.5rem;
+    margin-bottom: 20px;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.login-left h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0 0 15px 0;
+}
+
+.login-left p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0;
+    font-weight: 300;
+}
+
+/* Elementos decorativos (círculos abstractos en el lado verde) */
+.circle {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    z-index: 1;
+}
+
+.circle-1 {
+    width: 300px;
+    height: 300px;
+    top: -100px;
+    right: -100px;
+}
+
+.circle-2 {
+    width: 200px;
+    height: 200px;
+    bottom: -50px;
+    left: -50px;
+}
+
+/* === LADO DERECHO (FORMULARIO) === */
+.login-right {
+    flex: 1;
+    padding: 50px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: #ffffff;
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.form-header h2 {
+    margin: 0;
+    color: #1a3c6e;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.form-header p {
+    color: #6b7280;
+    margin: 8px 0 0 0;
+    font-size: 0.95rem;
+}
+
+.error-msg {
+    background-color: #fee2e2;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #374151;
+    font-weight: 600;
+}
+
+/* Contenedor relativo para posicionar los iconos de Bootstrap */
+.input-wrapper {
+    position: relative;
+}
+
+.input-icon {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 1.1rem;
+    transition: color 0.3s;
+}
+
+.input-wrapper input {
+    width: 100%;
+    /* Dejamos espacio a la izquierda para que no se pise con el icono (40px) */
+    padding: 12px 12px 12px 40px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    outline: none;
+    color: #1f2937;
+}
+
+/* Efecto al escribir o seleccionar: El borde y el icono se iluminan de verde */
+.input-wrapper input:focus {
+    border-color: #1C960C;
+    box-shadow: 0 0 0 4px rgba(28, 150, 12, 0.1);
+}
+
+.input-wrapper input:focus + .input-icon,
+.input-wrapper input:not(:placeholder-shown) ~ .input-icon {
+    color: #1C960C;
+}
+
+.form-options {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #4b5563;
+    cursor: pointer;
+}
+
+.remember-me input {
+    accent-color: #1C960C;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.btn-login {
+    width: 100%;
+    padding: 14px;
+    background: #1C960C; /* Tu verde principal */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(28, 150, 12, 0.25); /* Sombreado de profundidad */
+}
+
+.btn-login:hover {
+    background: #27E757; /* Al pasar el mouse, cambia a tu verde brillante */
+    box-shadow: 0 6px 16px rgba(39, 231, 87, 0.35);
+    transform: translateY(-2px);
+}
+
+/* === RESPONSIVO === */
+/* Si se ve en una pantalla pequeña (móvil), la tarjeta cambia a una sola columna vertical */
+@media (max-width: 768px) {
+    .login-container {
+        flex-direction: column;
+        max-width: 400px;
+    }
+    
+    .login-left {
+        padding: 30px 20px;
+        text-align: center;
+    }
+
+    .login-left h1 {
+        font-size: 1.8rem;
+    }
+
+    .login-right {
+        padding: 30px 20px;
+    }
+}

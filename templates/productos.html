@@ -1,0 +1,297 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo de Productos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/productos.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-info">
+        <h1>Catálogo de Productos</h1>
+        <p>Explora la disponibilidad agrupada por modelo, marca y familia</p>
+    </div>
+    
+    <div class="topbar-actions">
+        {% if user.is_authenticated %}
+            <a href="{% url 'dashboard' %}" class="btn-dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a href="{% url 'logout' %}" class="btn-logout">
+                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+            </a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn-login">
+                <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+            </a>
+        {% endif %}
+    </div>
+</header>
+
+<div class="barra-movil-filtros">
+    <button type="button" class="btn-filtros-movil" id="btnFiltros">
+        <i class="bi bi-sliders"></i>
+        <span>Filtros</span>
+        {% if familia_actual or marca_actual or busqueda %}
+            <span class="punto-activo"></span>
+        {% endif %}
+    </button>
+</div>
+
+<div class="overlay-filtros" id="overlayFiltros"></div>
+
+<div class="layout">
+
+    <aside class="sidebar" id="sidebarFiltros">
+
+        <div class="sidebar-header-movil">
+            <span>Filtros</span>
+            <button type="button" class="cerrar-filtros" id="cerrarFiltros" aria-label="Cerrar filtros">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="bloque-filtro">
+            <h2>Buscar</h2>
+            <form class="form-busqueda" method="get" action="">
+                {% if familia_actual %}
+                    <input type="hidden" name="familia" value="{{ familia_actual }}">
+                {% endif %}
+                {% if marca_actual %}
+                    <input type="hidden" name="marca" value="{{ marca_actual }}">
+                {% endif %}
+                <input
+                    type="text"
+                    name="q"
+                    placeholder="Nombre, código o marca..."
+                    value="{{ busqueda }}"
+                >
+                <button type="submit">Buscar</button>
+            </form>
+        </div>
+
+        <details class="bloque-filtro" open>
+            <summary>Familias</summary>
+            <ul class="lista-opciones">
+                {% for familia in familias %}
+                    <li>
+                        <a
+                            href="?familia={{ familia.codigo }}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}"
+                            class="{% if familia_actual == familia.codigo %}activa{% endif %}"
+                        >
+                            <span>{{ familia.descripcion }}</span>
+                            <span class="badge">{{ familia.total }}</span>
+                        </a>
+                    </li>
+                {% empty %}
+                    <li class="sin-opciones">No hay familias disponibles.</li>
+                {% endfor %}
+            </ul>
+            {% if familia_actual %}
+                <a class="limpiar-filtro" href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de familia</a>
+            {% endif %}
+        </details>
+
+        <details class="bloque-filtro" open>
+            <summary>Marcas</summary>
+            <ul class="lista-opciones">
+                {% for marca in marcas %}
+                    <li>
+                        <a
+                            href="?marca={{ marca.nombre }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}"
+                            class="{% if marca_actual == marca.nombre %}activa{% endif %}"
+                        >
+                            <span>{{ marca.nombre }}</span>
+                            <span class="badge">{{ marca.total }}</span>
+                        </a>
+                    </li>
+                {% empty %}
+                    <li class="sin-opciones">No hay marcas disponibles.</li>
+                {% endfor %}
+            </ul>
+            {% if marca_actual %}
+                <a class="limpiar-filtro" href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de marca</a>
+            {% endif %}
+        </details>
+
+        {% if familia_actual or marca_actual or busqueda %}
+            <a class="limpiar-todo" href="?">✕ Limpiar todos los filtros</a>
+        {% endif %}
+
+    </aside>
+
+    <main class="contenido">
+
+        <div class="barra-resultados">
+            <div class="info">
+                <strong>{{ page_obj.paginator.count }}</strong> modelo{{ page_obj.paginator.count|pluralize }} encontrado{{ page_obj.paginator.count|pluralize }}
+                {% if page_obj.paginator.num_pages > 1 %}
+                    &middot; página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                {% endif %}
+            </div>
+
+            <div class="chips-activos">
+                {% if busqueda %}
+                    <div class="chip">
+                        "{{ busqueda }}"
+                        <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}">✕</a>
+                    </div>
+                {% endif %}
+                {% if marca_actual %}
+                    <div class="chip">
+                        Marca: {{ marca_actual }}
+                        <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
+                    </div>
+                {% endif %}
+                {% if familia_actual %}
+                    <div class="chip">
+                        Familia: {{ familia_actual }}
+                        <a href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if grupos %}
+            <div class="grid-productos">
+                {% for grupo in grupos %}
+                    <article class="tarjeta">
+
+                        <div class="imagen-wrap">
+                            {% if grupo.imagen_url %}
+                                <img src="{{ grupo.imagen_url }}" alt="{{ grupo.nombre }}">
+                            {% else %}
+                                {{ grupo.nombre|slice:":2"|upper }}
+                            {% endif %}
+                            
+                            {% if grupo.cantidad > 1 %}
+                                <span class="badge-variantes">{{ grupo.cantidad }} variantes</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="cuerpo">
+
+                            {% if grupo.marca %}
+                                <span class="marca">{{ grupo.marca }}</span>
+                            {% endif %}
+
+                            <h3 class="nombre">{{ grupo.nombre }}</h3>
+
+                            {% if grupo.familia %}
+                                <span class="familia">{{ grupo.familia.descripcion }}</span>
+                            {% endif %}
+                            
+                            {% if grupo.descripcion_grupo %}
+                                <p class="desc-grupo">
+                                    {{ grupo.descripcion_grupo }}
+                                </p>
+                            {% elif grupo.cantidad == 1 and grupo.productos.0.descripcion %}
+                                <p class="desc-grupo">
+                                    {{ grupo.productos.0.descripcion }}
+                                </p>
+                            {% endif %}
+
+                            {% if grupo.cantidad > 1 %}
+                                <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle">
+                                    Ver {{ grupo.cantidad }} variantes
+                                </a>
+                            {% else %}
+                                <a href="{% url 'detalle_producto' grupo.id_referencia %}" class="btn-ver-detalle secundario">
+                                    Ver detalle
+                                </a>
+                            {% endif %}
+
+                            <div class="footer-tarjeta">
+                                <div class="precio">
+                                    {% if grupo.precio_desde %}
+                                        <span class="desde">Desde</span>
+                                        ${{ grupo.precio_desde|floatformat:0 }}
+                                    {% else %}
+                                        Consultar precio
+                                    {% endif %}
+                                </div>
+                                <div class="variantes-count">
+                                    {% if grupo.cantidad == 1 %}
+                                        {{ grupo.productos.0.codigo }}
+                                    {% endif %}
+                                    {% if grupo.unidad_medida %}
+                                        <span class="unidad-medida" style="margin-left: 5px; font-weight: bold; color: #666;">
+                                            | {{ grupo.unidad_medida }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="estado-vacio">
+                <h3>No se encontraron productos</h3>
+                <p>Prueba ajustando la búsqueda o quitando los filtros aplicados.</p>
+            </div>
+        {% endif %}
+
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav class="paginacion">
+
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹</a>
+                {% endif %}
+
+                {% for numero in page_obj.paginator.page_range %}
+                    {% if numero == page_obj.number %}
+                        <span class="actual">{{ numero }}</span>
+                    {% elif numero == 1 or numero == page_obj.paginator.num_pages or numero|add:"-1" == page_obj.number or numero|add:"1" == page_obj.number %}
+                        <a href="?page={{ numero }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ numero }}</a>
+                    {% elif numero == 2 or numero == page_obj.paginator.num_pages|add:"-1" %}
+                        <span class="puntos">…</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">›</a>
+                {% endif %}
+
+            </nav>
+        {% endif %}
+
+    </main>
+
+</div>
+
+<script>
+(function () {
+    const btnFiltros = document.getElementById('btnFiltros');
+    const sidebar = document.getElementById('sidebarFiltros');
+    const overlay = document.getElementById('overlayFiltros');
+    const cerrar = document.getElementById('cerrarFiltros');
+
+    function abrirFiltros() {
+        sidebar.classList.add('sidebar-abierta');
+        overlay.classList.add('activo');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function cerrarFiltros() {
+        sidebar.classList.remove('sidebar-abierta');
+        overlay.classList.remove('activo');
+        document.body.style.overflow = '';
+    }
+
+    if (btnFiltros) btnFiltros.addEventListener('click', abrirFiltros);
+    if (overlay) overlay.addEventListener('click', cerrarFiltros);
+    if (cerrar) cerrar.addEventListener('click', cerrarFiltros);
+})();
+</script>
+
+</body>
+</html>

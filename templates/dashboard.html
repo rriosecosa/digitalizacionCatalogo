@@ -1,0 +1,277 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gestión de Catálogo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="header-dash">
+        <div class="header-title-group">
+            <h1>Panel de Control</h1>
+            <p class="subtitle">Gestión de Catálogo e Inventario Ecosa</p>
+        </div>
+        
+        <div class="header-actions" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            
+            <a href="{% url 'productos' %}" class="btn-link btn-secundario">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                Catálogo Público
+            </a>
+
+            <div class="dropdown">
+                <button type="button" class="btn-link btn-primario" onclick="toggleMenuPDFs(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Gestión de PDFs ▾
+                </button>
+                
+                <div class="dropdown-menu" id="menuFlotantePDF">
+                    {% if request.user.is_superuser %}
+                    <a href="{% url 'menu_exportar' %}" class="dropdown-item">
+                        <i class="fas fa-file-export fa-fw text-secondary"></i> Generar Nuevo PDF
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    {% endif %}
+
+                    {% if catalogo_vigente_con_precio %}
+                    <a href="{% url 'descargar_catalogo_version' catalogo_vigente_con_precio.id %}" class="dropdown-item text-success">
+                        <i class="fas fa-dollar-sign fa-fw"></i> Descargar CON Precios
+                    </a>
+                    {% endif %}
+
+                    {% if catalogo_vigente_sin_precio %}
+                    <a href="{% url 'descargar_catalogo_version' catalogo_vigente_sin_precio.id %}" class="dropdown-item text-info">
+                        <i class="fas fa-eye-slash fa-fw"></i> Descargar SIN Precios
+                    </a>
+                    {% endif %}
+
+                    {% if not catalogo_vigente_con_precio and not catalogo_vigente_sin_precio %}
+                    <span class="dropdown-item text-muted" style="justify-content: center; font-size: 13px;">No hay catálogos vigentes</span>
+                    {% endif %}
+
+                    <div class="dropdown-divider"></div>
+
+                    <a href="{% url 'historial_catalogo' %}" class="dropdown-item">
+                        <i class="fas fa-history fa-fw text-secondary"></i> Ver Historial Completo
+                    </a>
+                </div>
+            </div>
+
+            <form action="{% url 'logout' %}" method="post" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn-link btn-peligro" style="cursor: pointer;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    Cerrar Sesión
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 12px 16px; margin-bottom: 20px; border-radius: 8px; background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if request.user.is_superuser %}
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <p class="kpi-title">Productos Activos</p>
+            <p class="kpi-value">{{ kpi_productos_activos }}</p>
+        </div>
+        <div class="kpi-card">
+            <p class="kpi-title">Familias Activas</p>
+            <p class="kpi-value">{{ kpi_familias_activas }}</p>
+        </div>
+        <div class="kpi-card">
+            <p class="kpi-title">Marcas / Proveedores</p>
+            <p class="kpi-value">{{ kpi_proveedores }}</p>
+        </div>
+        <div class="kpi-card">
+            <p class="kpi-title">Nuevos (Últimos 6 meses)</p>
+            <p class="kpi-value">{{ kpi_nuevos_6_meses }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="search-bar">
+        <form method="get" action="{% url 'dashboard' %}" style="display: flex; gap: 12px; width: 100%;">
+            <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscar por código, descripción o marca..." class="search-input">
+            <button type="submit" class="btn-search">Buscar</button>
+            {% if busqueda %}
+                <a href="{% url 'dashboard' %}" class="btn-clear">Limpiar</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">Imagen</th>
+                    <th style="width: 120px;">Código</th>
+                    <th>Producto / Grupo</th>
+                    <th>Familia</th>
+                    <th>Proveedor</th>
+                    <th style="width: 100px; text-align: center;">Stock</th>
+                    {% if request.user.is_superuser %}
+                    <th style="width: 100px; text-align: center;">Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in productos %}
+                <tr>
+                    <td>
+                        {% if p.imagen_url %}
+                            <img src="{{ p.imagen_url }}" alt="{{ p.grupo_nombre }}" class="thumb-img">
+                        {% else %}
+                            <div class="no-img">Sin Foto</div>
+                        {% endif %}
+                    </td>
+                    <td class="col-codigo">{{ p.codigo|default:"---" }}</td>
+                    <td class="col-nombre">
+                        <div class="nombre-principal">{{ p.grupo_nombre }}</div>
+                        {% if p.descripcion_grupo %}
+                            <div class="sub-desc">{{ p.descripcion_grupo|truncatechars:60 }}</div>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge-familia">{{ p.familia_temporal|default:"General" }}</span></td>
+                    <td>{{ p.proveedor.marca|default:"Sin Marca" }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge-stock {% if p.stock_disponible > 0 %}stock-ok{% else %}stock-out{% endif %}">
+                            {{ p.stock_disponible }}
+                        </span>
+                    </td>
+                    {% if request.user.is_superuser %}
+                    <td style="text-align: center;">
+                        <button type="button" class="btn-modificar" onclick="abrirModal('modal-{{ p.field_id }}')">
+                            Modificar
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+
+                {% if request.user.is_superuser %}
+                <div class="modal" id="modal-{{ p.field_id }}">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Modificar Producto: {{ p.codigo }}</h3>
+                            <button type="button" class="btn-cerrar" onclick="cerrarModal('modal-{{ p.field_id }}')">&times;</button>
+                        </div>
+                        <form method="post" action="{% url 'editar_producto' p.field_id %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label>Grupo / Producto:</label>
+                                    <input type="text" class="form-control" value="{{ p.grupo_nombre }}" disabled>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Descripción del Grupo:</label>
+                                    <textarea name="descripcion_grupo" class="form-control" rows="3" placeholder="Añade detalles o especificaciones...">{{ p.descripcion_grupo }}</textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Imagen del Producto:</label>
+                                    {% if p.imagen_url %}
+                                        <div style="margin-bottom: 8px;">
+                                            <img src="{{ p.imagen_url }}" style="max-height: 80px; border-radius: 4px; border: 1px solid #cbd5e1;">
+                                        </div>
+                                    {% endif %}
+                                    <input type="file" name="imagen" class="form-control" accept="image/*">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn-cancelar" onclick="cerrarModal('modal-{{ p.field_id }}')">Cancelar</button>
+                                <button type="submit" class="btn-guardar">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">
+                        No se encontraron productos que coincidan con los criterios de búsqueda.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="paginacion">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">« Anterior</a>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+                <span class="active">{{ num }}</span>
+            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <a href="?page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">Siguiente »</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Función para manejar el clic del menú desplegable
+    function toggleMenuPDFs(event) {
+        event.stopPropagation(); // Evita que el clic se propague al document y cierre el menú de inmediato
+        var menu = document.getElementById('menuFlotantePDF');
+        menu.classList.toggle('show');
+    }
+
+    function abrirModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden'; 
+    }
+
+    function cerrarModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Este evento escucha cualquier clic en la ventana
+    window.onclick = function(event) {
+        // Cerrar modales si se hace clic afuera
+        if (event.target.classList.contains('modal')) {
+            event.target.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Cerrar el menú desplegable de PDFs si se hace clic en cualquier otro lado
+        if (!event.target.closest('.dropdown')) {
+            var menu = document.getElementById('menuFlotantePDF');
+            if (menu && menu.classList.contains('show')) {
+                menu.classList.remove('show');
+            }
+        }
+    }
+</script>
+
+</body>
+</html>
