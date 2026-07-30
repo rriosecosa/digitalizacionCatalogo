@@ -574,17 +574,81 @@ def obtener_logo_marca(marca: str) -> str | None:
 
     return None
 
-# -------------------------------------------------------------
+@login_required(login_url='/login/')
+def historial_catalogo(request):
+    catalogos_con_precio = CatalogCache.objects.exclude(
+        pdf_file__icontains='Sin_Precio'
+    ).order_by('-version_number')
+    
+    catalogos_sin_precio = CatalogCache.objects.filter(
+        pdf_file__icontains='Sin_Precio'
+    ).order_by('-version_number')
+
+    return render(request, 'historial_catalogo.html', {
+        'catalogos_con_precio': catalogos_con_precio,
+        'catalogos_sin_precio': catalogos_sin_precio,
+    })
+
+
+@login_required(login_url='/login/')
+def descargar_catalogo(request):
+    catalogo_actual = CatalogCache.objects.filter(is_current=True).order_by('-version_number').first()
+
+    if not catalogo_actual or not catalogo_actual.pdf_file:
+        messages.error(request, "Todavía no se ha generado ningún catálogo en PDF.")
+        return redirect('dashboard')
+
+    nombre_archivo = catalogo_actual.pdf_file.name.split('/')[-1]
+    return FileResponse(
+        catalogo_actual.pdf_file.open('rb'),
+        as_attachment=True,
+        filename=nombre_archivo,
+        content_type='application/pdf',
+    )
+
+
+@login_required(login_url='/login/')
+def descargar_catalogo_version(request, catalogo_id):
+    catalogo = get_object_or_404(CatalogCache, pk=catalogo_id)
+
+    if not catalogo.pdf_file:
+        messages.error(request, "Esta versión no tiene un archivo asociado.")
+        return redirect('historial_catalogo')
+
+    nombre_archivo = catalogo.pdf_file.name.split('/')[-1]
+    return FileResponse(
+        catalogo.pdf_file.open('rb'),
+        as_attachment=True,
+        filename=nombre_archivo,
+        content_type='application/pdf',
+    )
+
+
+@login_required(login_url='/login/')
+def eliminar_catalogo(request, catalogo_id):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+
+    catalogo = get_object_or_404(CatalogCache, pk=catalogo_id)
+    if catalogo.pdf_file:
+        catalogo.pdf_file.delete(save=False)
+
+    catalogo.delete()
+    messages.success(request, f"La versión {catalogo.version_number} del catálogo y su archivo PDF fueron eliminados para liberar espacio.")
+    return redirect('historial_catalogo')
+
+
+# ==========================================
+# GENERACIÓN PDF (PLAYWRIGHT)
+# ==========================================
+
 @login_required(login_url='/login/')
 @user_passes_test(lambda u: u.is_superuser)
 def generar_pdf(request):
     if request.method == 'POST':
         grupos_seleccionados = request.POST.getlist('grupos_seleccionados')
-
-        # --- Capturar el tipo de catálogo ---
         tipo_catalogo = request.POST.get('tipo_catalogo', 'con_precio')
         sin_precio = (tipo_catalogo == 'sin_precio')
-        # -------------------------------------------
 
         if not grupos_seleccionados:
             messages.error(request, "Debes seleccionar al menos un grupo para generar el catálogo.")
@@ -616,8 +680,6 @@ def generar_pdf(request):
             p.descripcion_grupo or p.descripcion or ""
         ))
 
-        # file:// directo al disco: evita pedirle las imágenes por HTTP al mismo
-        # servidor Django que está generando el PDF
         imagenes_dict = {
             img.grupo_nombre: obtener_file_uri(img.imagen)
             for img in ImagenProducto.objects.all() if img.imagen
@@ -660,12 +722,8 @@ def generar_pdf(request):
                     sorted(grupos.items(), key=lambda item: (item[1]['es_ancha'], item[0]))
                 )
 
-        # -------------------------------------------------------------
-        # CONVERSIÓN DE IMÁGENES ESTÁTICAS A BASE64
-        # -------------------------------------------------------------
         logo_base64 = obtener_base64_imagen('static/img/logo_ecosa.png')
         portada_base64 = obtener_base64_imagen('static/img/portada.png')
-        # -------------------------------------------------------------
 
         html_string = render_to_string('catalogo_pdf.html', {
             'catalogo': catalogo,
@@ -675,9 +733,6 @@ def generar_pdf(request):
             'sin_precio': sin_precio,
         })
 
-        # -------------------------------------------------------------
-        # BLOQUE DE PLAYWRIGHT OPTIMIZADO PARA DOCKER
-        # -------------------------------------------------------------
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
@@ -699,8 +754,28 @@ def generar_pdf(request):
                 page = browser.new_page()
                 page.goto(f'file://{tmp_html_path}', wait_until="networkidle", timeout=90000)
 
+                # Script cliente para paginado dinámico en el Índice
+                page.evaluate("""() => {
+                    const PAGE_HEIGHT_PX = 1056; 
+                    const sections = document.querySelectorAll('.seccion-familia');
+                    
+                    sections.forEach(sec => {
+                        const id = sec.getAttribute('id');
+                        if (id) {
+                            const rect = sec.getBoundingClientRect();
+                            const top = rect.top + window.scrollY;
+                            const pageNum = Math.floor(top / PAGE_HEIGHT_PX) + 1;
+                            
+                            const targetSpans = document.querySelectorAll(`[data-target-page="${id}"]`);
+                            targetSpans.forEach(span => {
+                                span.textContent = pageNum;
+                            });
+                        }
+                    });
+                }""")
+
                 pdf_bytes = page.pdf(
-                    format="A4",
+                    format="Letter",
                     print_background=True,
                     margin={"top": "0mm", "bottom": "0mm", "left": "0mm", "right": "0mm"}
                 )
@@ -711,18 +786,12 @@ def generar_pdf(request):
 
         fecha_actual = datetime.now().strftime('%d-%m-%Y')
         
-        # --- Cambiamos el nombre del archivo físico según la versión ---
         if sin_precio:
             nombre_archivo = f"Catalogo_Ecosa_Sin_Precio_{fecha_actual}.pdf"
-        else:
-            nombre_archivo = f"Catalogo_Ecosa_{fecha_actual}.pdf"
-        # ----------------------------------------------------------------------
-
-        # --- CONTROL INDEPENDIENTE DE LÍMITE (3 "CON PRECIO" / 3 "SIN PRECIO") ---
-        if sin_precio:
             catalogos_existentes = CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio').order_by('version_number')
             texto_tipo = "sin precio"
         else:
+            nombre_archivo = f"Catalogo_Ecosa_{fecha_actual}.pdf"
             catalogos_existentes = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').order_by('version_number')
             texto_tipo = "con precio"
 
@@ -733,7 +802,6 @@ def generar_pdf(request):
             catalogo_mas_antiguo.delete()
             messages.warning(request, f"Se ha eliminado el catálogo {texto_tipo} más antiguo para liberar espacio.")
 
-        # Desmarcar el estado vigente solo del tipo que se está generando
         if sin_precio:
             CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio', is_current=True).update(is_current=False)
         else:
