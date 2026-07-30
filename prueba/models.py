@@ -67,6 +67,7 @@ class VistaProductoAgrupado(models.Model):
     precio_base_pesos = models.FloatField(blank=True, null=True)
     stock_disponible = models.FloatField(blank=True, null=True)
     eliminado = models.FloatField(blank=True, null=True)
+    familia_nombre = models.CharField(max_length=255, null=True, blank=True)
     unidad_medida = models.TextField(blank=True, null=True)
 
     proveedor = models.ForeignKey(

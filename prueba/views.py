@@ -351,38 +351,47 @@ def dashboard_productos(request):
 # ==========================================
 # VISTAS RESTANTES
 # ==========================================
-
 @permission_required('prueba.change_producto', login_url='login')
 def editar_producto(request, producto_id):
     if request.method == "POST":
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
+        # Capturamos la ruta en texto plano
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
         grupo_nombre = request.POST.get("grupo_nombre")
         descripcion_grupo = request.POST.get("descripcion_grupo")
 
         try:
-            precio_float = float(precio) if precio else None
-            stock_float = float(stock) if stock else None
-
-            Producto.objects.filter(field_id=producto_id).update(
-                precio_base_pesos=precio_float,
-                stock_disponible=stock_float
-            )
+            update_fields = {}
+            if precio is not None and precio != "":
+                update_fields['precio_base_pesos'] = float(precio)
+            if stock is not None and stock != "":
+                update_fields['stock_disponible'] = float(stock)
+            
+            if update_fields:
+                Producto.objects.filter(field_id=producto_id).update(**update_fields)
 
             if grupo_nombre:
                 img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
-                if ruta_imagen:
-                    img_obj.imagen = ruta_imagen
+                
+                # Si el usuario escribió 'media/' o '/media/' por error, lo limpiamos para guardar solo la ruta relativa
+                if ruta_imagen.startswith('/media/'):
+                    ruta_imagen = ruta_imagen[7:]
+                elif ruta_imagen.startswith('media/'):
+                    ruta_imagen = ruta_imagen[6:]
+                
+                # Guardamos la ruta de texto en la base de datos
+                img_obj.imagen = ruta_imagen
+                
                 if descripcion_grupo is not None:
                     img_obj.descripcion = descripcion_grupo.strip()
+                    
                 img_obj.save()
 
             messages.success(request, "Producto actualizado correctamente.")
         except ValueError:
-            messages.error(request, "Error: Los valores ingresados no son numéricos válidos.")
+            messages.error(request, "Error: Los valores ingresados no son válidos.")
 
-    # Redirección mejorada con captura de ruta completa si existe
     return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
 
 
