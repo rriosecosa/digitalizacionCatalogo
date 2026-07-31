@@ -125,7 +125,7 @@
                     <th>Producto / Grupo</th>
                     <th>Familia</th>
                     <th>Proveedor</th>
-                    <th style="width: 100px; text-align: center;">Stock</th>
+                    <th style="width: 120px; text-align: center;">Cód. Origen</th>
                     {% if request.user.is_superuser %}
                     <th style="width: 100px; text-align: center;">Acciones</th>
                     {% endif %}
@@ -151,8 +151,8 @@
                     <td><span class="badge-familia">{{ p.familia_nombre|default:"General" }}</span></td>
                     <td>{{ p.proveedor.marca|default:"Sin Marca" }}</td>
                     <td style="text-align: center;">
-                        <span class="badge-stock {% if p.stock_disponible > 0 %}stock-ok{% else %}stock-out{% endif %}">
-                            {{ p.stock_disponible }}
+                        <span style="font-weight: 600; color: #475569; background-color: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-size: 13px;">
+                            {{ p.codigo_de_origen|default:"---" }}
                         </span>
                     </td>
                     {% if request.user.is_superuser %}

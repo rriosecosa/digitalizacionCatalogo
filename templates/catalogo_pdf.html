@@ -1,4 +1,5 @@
 {% load static %}
+{% load catalogo_extras %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,13 +10,14 @@
     
     <style>
         /* =========================================================
-           1. CONFIGURACIÓN DE PÁGINA Y MÁRGENES (TAMAÑO CARTA)
+           1. CONFIGURACIÓN DE PÁGINA Y MÁRGENES ESTRICTOS (CARTA)
            ========================================================= */
         @page {
             size: letter portrait; /* 215.9mm x 279.4mm */
-            margin: 8mm 6mm 12mm 6mm;
+            margin: 18mm 10mm 18mm 10mm; /* 18mm Top/Bottom garantizan zona para cabecera y pie */
         }
 
+        /* La portada es la única página full bleed (sin márgenes) */
         @page :first {
             margin: 0 !important; 
         }
@@ -37,7 +39,7 @@
         }
 
         /* =========================================================
-           2. PORTADA E ÍNDICE
+           2. PORTADA
            ========================================================= */
         .portada-contenedor {
             page-break-after: always;
@@ -51,7 +53,6 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            z-index: 2000;
             background-color: #ffffff;
         }
 
@@ -63,56 +64,61 @@
             display: block;
         }
 
-        .portada-fallback {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-        }
-
+        /* =========================================================
+           3. LOGO EN CABECERA (ARRIBA IZQUIERDA Y COMPLETO)
+           ========================================================= */
         .logo-ecosa {
             position: fixed;
-            top: 2mm;
-            right: 4mm;
-            width: 22mm;
-            height: auto;
+            top: -14mm; /* Se posiciona dentro del espacio reservado de 18mm superior */
+            left: 0mm;
+            height: 11mm;
+            width: auto;
             z-index: 999;
         }
 
+        /* =========================================================
+           4. ÍNDICE DE CONTENIDOS (EVITA TÍTULO HUÉRFANO)
+           ========================================================= */
         .indice-contenedor {
             page-break-after: always;
             break-after: page;
-            padding: 4mm 10mm 10mm 10mm;
+            page-break-inside: avoid; /* Evita que el contenedor del índice se rompa en dos si cabe en una página */
+            break-inside: avoid;
+            padding-top: 2mm;
         }
         
         .indice-titulo {
-            font-size: 20pt;
+            font-size: 18pt;
             font-weight: bold;
             color: #1c960c;
             text-align: center;
             border-bottom: 2px solid #27e757;
-            padding-bottom: 8px;
-            margin-bottom: 20px;
+            padding-bottom: 6px;
+            margin-top: 0;
+            margin-bottom: 16px;
             text-transform: uppercase;
             letter-spacing: 1px;
+            page-break-after: avoid; /* OBLIGATORIO: Mantiene el título unido al contenido */
+            break-after: avoid;
         }
         
         .indice-columnas {
             column-count: 2;
-            column-gap: 30px;
+            column-gap: 24px;
+            page-break-before: avoid;
+            break-before: avoid;
         }
         
         .indice-marca {
-            font-size: 12pt;
+            font-size: 11pt;
             font-weight: bold;
             color: #0f172a;
             margin-top: 0;
-            margin-bottom: 8px;
-            break-after: avoid;
+            margin-bottom: 6px;
             page-break-after: avoid;
+            break-after: avoid;
             background-color: #f1f5f9;
-            padding: 4px 8px;
+            padding: 3px 6px;
             border-radius: 4px;
             border-left: 4px solid #1c960c;
         }
@@ -120,28 +126,28 @@
         .indice-lista {
             list-style: none;
             padding: 0;
-            margin: 0 0 20px 0;
+            margin: 0 0 14px 0;
         }
         
         .indice-lista li {
             display: flex;
             align-items: baseline;
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #475569;
-            padding: 4px 0 4px 12px;
+            padding: 3px 0 3px 10px;
             border-bottom: 1px dashed #e2e8f0;
-            break-inside: avoid;
             page-break-inside: avoid;
+            break-inside: avoid;
             position: relative;
         }
         
         .indice-lista li::before {
             content: "■";
             color: #27e757;
-            font-size: 5pt;
+            font-size: 4pt;
             position: absolute;
             left: 0;
-            top: 7px;
+            top: 5px;
         }
 
         .indice-familia-nombre {
@@ -151,7 +157,7 @@
         .indice-puntos {
             flex: 1 1 auto;
             border-bottom: 1px dotted #cbd5e1;
-            margin: 0 6px 3px 6px;
+            margin: 0 4px 2px 4px;
             height: 0;
         }
 
@@ -164,22 +170,22 @@
         }
 
         /* =========================================================
-           3. ESTILOS DE CATEGORÍAS Y TARJETAS
+           5. PRODUCTOS Y SECCIONES
            ========================================================= */
         .seccion-familia {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             page-break-inside: avoid;
             break-inside: avoid;
         }
 
         .titulo-familia {
-            font-size: 14pt;
+            font-size: 12pt;
             font-weight: bold;
             color: #1c960c;
             border-bottom: 2px solid #27e757;
             padding-bottom: 2px;
-            margin-bottom: 8px;
-            margin-top: 4px;
+            margin-bottom: 6px;
+            margin-top: 2px;
             page-break-after: avoid;
             break-after: avoid;
         }
@@ -187,16 +193,16 @@
         .grid-productos {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
             justify-content: flex-start;
             width: 100%;
         }
 
         .tarjeta-producto {
-            width: calc(33.333% - 5.4px);
+            width: calc(33.333% - 4px);
             border: 1px solid #cbd5e1;
-            border-radius: 5px;
-            padding: 6px;
+            border-radius: 4px;
+            padding: 5px;
             page-break-inside: avoid;
             break-inside: avoid;
             background-color: #ffffff;
@@ -205,9 +211,9 @@
         .tarjeta-ancha {
             width: 100%;
             border: 1px solid #cbd5e1;
-            border-radius: 5px;
-            padding: 8px;
-            margin-bottom: 8px;
+            border-radius: 4px;
+            padding: 6px;
+            margin-bottom: 6px;
             background-color: #ffffff;
             page-break-inside: avoid;
             break-inside: avoid;
@@ -215,48 +221,45 @@
 
         .imagen-producto {
             width: 100%;
-            height: 100px;
+            height: 90px;
             object-fit: contain;
             background-color: white;
-            border-radius: 4px;
+            border-radius: 3px;
             margin-bottom: 4px;
         }
 
         .titulo-producto {
-            font-size: 9pt;
+            font-size: 8.5pt;
             font-weight: bold;
             color: #0f172a;
-            margin: 0 0 4px 0;
+            margin: 0 0 3px 0;
             text-align: center;
         }
 
         .desc-producto {
-            font-size: 7pt;
+            font-size: 6.8pt;
             color: #475569;
             text-align: center;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
-        /* =========================================================
-           4. TABLA DE VARIANTES
-           ========================================================= */
         .tabla-variantes {
             width: 100%;
             border-collapse: collapse;
-            font-size: 6.8pt;
+            font-size: 6.5pt;
         }
 
         .tabla-variantes th {
             background-color: #f1f5f9;
             color: #334155;
-            padding: 3px;
+            padding: 2px 3px;
             text-align: left;
             border-bottom: 1px solid #cbd5e1;
             font-weight: bold;
         }
 
         .tabla-variantes td {
-            padding: 3px;
+            padding: 2px 3px;
             border-bottom: 1px solid #f1f5f9;
             color: #334155;
         }
@@ -273,7 +276,7 @@
         {% if portada_base64 %}
             <img src="{{ portada_base64 }}" alt="Portada Catálogo">
         {% else %}
-            <div class="portada-fallback">
+            <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
                 <h1 style="color:#1c960c; font-size:32pt; margin:0;">Catálogo Oficial Ecosa</h1>
             </div>
         {% endif %}
@@ -284,7 +287,7 @@
     {% endif %}
 
     <div class="indice-contenedor">
-        <div class="indice-titulo">Índice de Contenidos</div>
+        <h2 class="indice-titulo">Índice de Contenidos</h2>
         <div class="indice-columnas">
             {% for marca, familias in catalogo.items %}
                 <div class="indice-marca">{{ marca }}</div>
@@ -293,7 +296,7 @@
                         <li>
                             <span class="indice-familia-nombre">{{ familia }}</span>
                             <span class="indice-puntos"></span>
-                            <span class="indice-pagina" data-target-page="sec-{{ marca|slugify }}-{{ familia|slugify }}">1</span>
+                            <span class="indice-pagina">{{ paginas|dictget:marca|dictget:familia|default:"—" }}</span>
                         </li>
                     {% endfor %}
                 </ul>
@@ -304,7 +307,7 @@
     {% for marca, familias in catalogo.items %}
     <div>
         {% for familia, grupos in familias.items %}
-        <div class="seccion-familia" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
+        <div class="seccion-familia">
             <div class="titulo-familia">{{ marca }} - {{ familia }}</div>
 
             <div class="grid-productos">

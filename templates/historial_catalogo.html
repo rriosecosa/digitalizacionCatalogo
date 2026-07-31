@@ -1,265 +1,381 @@
-{% load static %}
-<!DOCTYPE html>
+{% load static %} {% load catalogo_extras %}
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Historial de Catálogos - Gestión de Catálogo</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'css/historial.css' %}">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Catálogo Oficial Ecosa 2026</title>
 
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h3><i class="fas fa-book-open me-2"></i>ECOSA</h3>
-            <button class="btn btn-link text-white d-md-none" id="closeSidebar">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        
-        <div class="sidebar-user">
-            <div class="user-avatar">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="user-info">
-                <p class="user-name">{{ request.user.username }}</p>
-                <p class="user-role">
-                    {% if request.user.is_superuser %}Administrador{% else %}Vendedor{% endif %}
-                </p>
-            </div>
-        </div>
+    <base href="{{ request.scheme }}://{{ request.get_host }}/" />
 
-        <ul class="sidebar-nav">
-            <li class="nav-item">
-                <a href="{% url 'dashboard' %}" class="nav-link">
-                    <i class="fas fa-home nav-icon"></i> Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{% url 'productos' %}" class="nav-link">
-                    <i class="fas fa-box nav-icon"></i> Catálogo Público
-                </a>
-            </li>
-            
-            {% if request.user.is_superuser %}
-            <li class="nav-item">
-                <a href="{% url 'menu_exportar' %}" class="nav-link">
-                    <i class="fas fa-file-pdf nav-icon"></i> Generar Catálogo
-                </a>
-            </li>
-            {% endif %}
+    <style>
+      /* =========================================================
+         1. ESTILOS BASE Y CONFIGURACIÓN DE PÁGINA
+         ========================================================= */
+      {% if seccion == 'inicio' %}
+      /* PRIMERA PASADA */
+      @page {
+          size: letter portrait;
+          margin: 0 !important;
+      }
+      {% else %}
+      /* SEGUNDA PASADA:  */
+      @page {
+          size: letter portrait;
+          margin-top: 28mm;    /* Separación de ~105px para la cabecera */
+          margin-bottom: 18mm; /* Separación para el pie de página */
+          margin-left: 10mm;
+          margin-right: 10mm;
+      }
+      {% endif %}
 
-            <li class="nav-item">
-                <a href="{% url 'historial_catalogo' %}" class="nav-link active">
-                    <i class="fas fa-history nav-icon"></i> Historial de Versiones
-                </a>
-            </li>
-            
-            <li class="nav-item mt-4">
-                <form action="{% url 'logout' %}" method="post" class="m-0 p-0">
-                    {% csrf_token %}
-                    <button type="submit" class="nav-link text-danger w-100 text-start border-0 bg-transparent">
-                        <i class="fas fa-sign-out-alt nav-icon"></i> Cerrar Sesión
-                    </button>
-                </form>
-            </li>
+      * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          box-sizing: border-box;
+      }
+
+      body {
+          font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+          color: #1e293b;
+          margin: 0;
+          padding: 0;
+          font-size: 8pt;
+          line-height: 1.2;
+          background: #ffffff;
+      }
+
+      /* Portada */
+      .portada-contenedor {
+          page-break-after: always;
+          break-after: page;
+          width: 100vw;
+          height: 100vh;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+      }
+
+      .portada-contenedor img {
+          width: 100vw;
+          height: 100vh;
+          object-fit: cover;
+          object-position: center;
+          display: block;
+      }
+
+      /* Índice */
+      .indice-contenedor {
+          page-break-after: always;
+          break-after: page;
+          padding: 15mm 10mm;
+      }
+
+      .indice-titulo {
+          font-size: 18pt;
+          font-weight: bold;
+          color: #1c960c;
+          text-align: center;
+          border-bottom: 2px solid #27e757;
+          padding-bottom: 6px;
+          margin-top: 0;
+          margin-bottom: 16px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          page-break-after: avoid;
+          break-after: avoid;
+      }
+
+      .indice-columnas {
+          column-count: 2;
+          column-gap: 24px;
+          page-break-before: avoid;
+          break-before: avoid;
+      }
+
+      .indice-marca {
+          font-size: 11pt;
+          font-weight: bold;
+          color: #0f172a;
+          margin-top: 0;
+          margin-bottom: 6px;
+          page-break-after: avoid;
+          break-after: avoid;
+          background-color: #f1f5f9;
+          padding: 3px 6px;
+          border-radius: 4px;
+          border-left: 4px solid #1c960c;
+      }
+
+      .indice-lista {
+          list-style: none;
+          padding: 0;
+          margin: 0 0 14px 0;
+      }
+
+      .indice-lista li {
+          display: flex;
+          align-items: baseline;
+          font-size: 8pt;
+          color: #475569;
+          padding: 3px 0 3px 10px;
+          border-bottom: 1px dashed #e2e8f0;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          position: relative;
+      }
+
+      .indice-lista li::before {
+          content: "■";
+          color: #27e757;
+          font-size: 4pt;
+          position: absolute;
+          left: 0;
+          top: 5px;
+      }
+
+      .indice-familia-nombre { white-space: nowrap; }
+
+      .indice-puntos {
+          flex: 1 1 auto;
+          border-bottom: 1px dotted #cbd5e1;
+          margin: 0 4px 2px 4px;
+          height: 0;
+      }
+
+      .indice-pagina {
+          font-weight: bold;
+          color: #1c960c;
+          min-width: 14px;
+          text-align: right;
+          white-space: nowrap;
+      }
+
+      /* Productos y Secciones */
+      .seccion-familia {
+          margin-bottom: 10px;
+      }
+
+      .titulo-familia {
+          font-size: 11.5pt;
+          font-weight: bold;
+          color: #1c960c;
+          border-bottom: 2px solid #27e757;
+          padding-bottom: 2px;
+          margin-bottom: 6px;
+          margin-top: 4px;
+          page-break-after: avoid;
+          break-after: avoid;
+      }
+
+      .grid-productos {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          justify-content: flex-start;
+          width: 100%;
+      }
+
+      .tarjeta-producto {
+          width: calc(33.333% - 3.5px);
+          border: 1px solid #cbd5e1;
+          border-radius: 4px;
+          padding: 4px;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          background-color: #ffffff;
+      }
+
+      .tarjeta-ancha {
+          width: 100%;
+          border: 1px solid #cbd5e1;
+          border-radius: 4px;
+          padding: 5px;
+          margin-bottom: 5px;
+          background-color: #ffffff;
+          page-break-inside: avoid;
+          break-inside: avoid;
+      }
+
+      .imagen-producto {
+          width: 100%;
+          height: 85px;
+          object-fit: contain;
+          background-color: white;
+          border-radius: 3px;
+          margin-bottom: 3px;
+      }
+
+      .titulo-producto {
+          font-size: 8pt;
+          font-weight: bold;
+          color: #0f172a;
+          margin: 0 0 2px 0;
+          text-align: center;
+      }
+
+      .desc-producto {
+          font-size: 6.5pt;
+          color: #475569;
+          text-align: center;
+          margin-bottom: 3px;
+      }
+
+      .tabla-variantes {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 6.2pt;
+      }
+
+      .tabla-variantes th {
+          background-color: #f1f5f9;
+          color: #334155;
+          padding: 1.5px 2px;
+          text-align: left;
+          border-bottom: 1px solid #cbd5e1;
+          font-weight: bold;
+      }
+
+      .tabla-variantes td {
+          padding: 1.5px 2px;
+          border-bottom: 1px solid #f1f5f9;
+          color: #334155;
+      }
+
+      .col-precio {
+          font-weight: bold;
+          color: #1c960c;
+      }
+    </style>
+  </head>
+  <body>
+    {% if seccion == 'inicio' or not seccion %}
+    <div class="portada-contenedor">
+      {% if portada_base64 %}
+      <img src="{{ portada_base64 }}" alt="Portada Catálogo" />
+      {% else %}
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+        "
+      >
+        <h1 style="color: #1c960c; font-size: 32pt; margin: 0">
+          Catálogo Oficial Ecosa
+        </h1>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="indice-contenedor">
+      <h2 class="indice-titulo">Índice de Contenidos</h2>
+      <div class="indice-columnas">
+        {% for marca, familias in catalogo.items %}
+        <div class="indice-marca">{{ marca }}</div>
+        <ul class="indice-lista">
+          {% for familia, grupos in familias.items %}
+          <li>
+            <span class="indice-familia-nombre">{{ familia }}</span>
+            <span class="indice-puntos"></span>
+            <span
+              class="indice-pagina"
+              data-target-page="sec-{{ marca|slugify }}-{{ familia|slugify }}"
+              >—</span
+            >
+          </li>
+          {% endfor %}
         </ul>
+        {% endfor %}
+      </div>
     </div>
+    {% endif %} {% if seccion == 'productos' or not seccion %} {% for marca,
+    familias in catalogo.items %}
+    <div>
+      {% for familia, grupos in familias.items %}
+      <div
+        class="seccion-familia"
+        id="sec-{{ marca|slugify }}-{{ familia|slugify }}"
+      >
+        <div class="titulo-familia">{{ marca }} - {{ familia }}</div>
 
-    <div class="main-content" id="mainContent">
-        <div class="topbar d-md-none">
-            <button class="btn btn-link text-dark" id="openSidebar">
-                <i class="fas fa-bars fa-lg"></i>
-            </button>
-            <h5 class="m-0 fw-bold">Historial de Catálogos</h5>
-        </div>
-
-        <div class="container-fluid py-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="h3 mb-0 text-gray-800">Historial de Versiones</h2>
-                    <p class="text-muted mb-0">Control independiente de versiones (Máximo 3 por modalidad)</p>
-                </div>
+        <div class="grid-productos">
+          {% for grupo, info in grupos.items %}
+          <div
+            class="{% if info.es_ancha %}tarjeta-ancha{% else %}tarjeta-producto{% endif %}"
+          >
+            {% if info.imagen_url %}
+            <img
+              src="{{ info.imagen_url }}"
+              class="imagen-producto"
+              alt="{{ grupo }}"
+            />
+            {% else %}
+            <div
+              class="imagen-producto"
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #f1f5f9;
+                color: #94a3b8;
+              "
+            >
+              Sin Imagen
             </div>
-
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
             {% endif %}
 
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
-                    <h5 class="m-0 font-weight-bold text-success">
-                        <i class="fas fa-dollar-sign me-2"></i>Catálogos CON Precios
-                    </h5>
-                    <span class="badge bg-success rounded-pill">{{ catalogos_con_precio|length }} / 3 guardados</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="ps-4">Versión</th>
-                                    <th>Fecha de Creación</th>
-                                    <th>Nombre de Archivo</th>
-                                    <th>Estado</th>
-                                    <th class="text-end pe-4">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cat in catalogos_con_precio %}
-                                <tr>
-                                    <td class="ps-4">
-                                        <strong>Versión {{ cat.version_number }}</strong>
-                                    </td>
-                                    <td>
-                                        <span class="text-muted">{{ cat.generated_at|date:"d-m-Y H:i"|default:"---" }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary rounded-pill text-truncate" style="max-width: 250px;">
-                                            <i class="fas fa-file-pdf me-1"></i> {{ cat.pdf_file.name }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if cat.is_current %}
-                                            <span class="badge bg-success">Vigente</span>
-                                        {% else %}
-                                            <span class="badge bg-warning text-dark">Antiguo</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'descargar_catalogo_version' cat.id %}" class="btn btn-sm btn-outline-primary" title="Descargar PDF">
-                                                <i class="fas fa-download"></i> Descargar
-                                            </a>
+            <h4 class="titulo-producto">{{ grupo }}</h4>
+            {% if info.descripcion %}
+            <p class="desc-producto">{{ info.descripcion }}</p>
+            {% endif %}
 
-                                            {% if request.user.is_superuser %}
-                                            <form action="{% url 'eliminar_catalogo' cat.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar la Versión {{ cat.version_number }} del catálogo CON precios?');">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar Archivo Físico">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </form>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">
-                                        <i class="fas fa-folder-open fa-2x mb-2 opacity-50"></i>
-                                        <p class="mb-0">No hay catálogos con precio generados aún.</p>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <table class="tabla-variantes">
+              <thead>
+                <tr>
+                  {% if sin_precio %}
+                  <th style="width: 35%">Código</th>
+                  <th style="width: 40%">Detalle</th>
+                  <th style="width: 25%">Unidad</th>
+                  {% else %}
+                  <th style="width: 28%">Código</th>
+                  <th style="width: 32%">Detalle</th>
+                  <th style="width: 15%">Unidad</th>
+                  <th style="width: 25%; text-align: right">Precio</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for var in info.variantes %}
+                <tr>
+                  <td class="col-codigo">{{ var.codigo|default:"---" }}</td>
+                  <td class="col-desc">
+                    {{ var.descripcion|default:"Estándar" }}
+                  </td>
+                  <td class="col-desc">{{ var.unidad_medida|default:"-" }}</td>
 
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
-                    <h5 class="m-0 font-weight-bold text-info">
-                        <i class="fas fa-eye-slash me-2"></i>Catálogos SIN Precios
-                    </h5>
-                    <span class="badge bg-info text-dark rounded-pill">{{ catalogos_sin_precio|length }} / 3 guardados</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="ps-4">Versión</th>
-                                    <th>Fecha de Creación</th>
-                                    <th>Nombre de Archivo</th>
-                                    <th>Estado</th>
-                                    <th class="text-end pe-4">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cat in catalogos_sin_precio %}
-                                <tr>
-                                    <td class="ps-4">
-                                        <strong>Versión {{ cat.version_number }}</strong>
-                                    </td>
-                                    <td>
-                                        <span class="text-muted">{{ cat.generated_at|date:"d-m-Y H:i"|default:"---" }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary rounded-pill text-truncate" style="max-width: 250px;">
-                                            <i class="fas fa-file-pdf me-1"></i> {{ cat.pdf_file.name }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if cat.is_current %}
-                                            <span class="badge bg-info text-dark">Vigente</span>
-                                        {% else %}
-                                            <span class="badge bg-warning text-dark">Antiguo</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'descargar_catalogo_version' cat.id %}" class="btn btn-sm btn-outline-primary" title="Descargar PDF">
-                                                <i class="fas fa-download"></i> Descargar
-                                            </a>
-
-                                            {% if request.user.is_superuser %}
-                                            <form action="{% url 'eliminar_catalogo' cat.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar la Versión {{ cat.version_number }} del catálogo SIN precios?');">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar Archivo Físico">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </form>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">
-                                        <i class="fas fa-folder-open fa-2x mb-2 opacity-50"></i>
-                                        <p class="mb-0">No hay catálogos sin precio generados aún.</p>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
+                  {% if not sin_precio %}
+                  <td class="col-precio" style="text-align: right">
+                    {% if var.precio_base_pesos %} ${{
+                    var.precio_base_pesos|floatformat:0 }} {% else %} --- {%
+                    endif %}
+                  </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endfor %}
         </div>
+      </div>
+      {% endfor %}
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('mainContent');
-            const openBtn = document.getElementById('openSidebar');
-            const closeBtn = document.getElementById('closeSidebar');
-
-            if (openBtn) {
-                openBtn.addEventListener('click', function() {
-                    sidebar.classList.add('show');
-                    mainContent.classList.add('sidebar-open');
-                });
-            }
-
-            if (closeBtn) {
-                closeBtn.addEventListener('click', function() {
-                    sidebar.classList.remove('show');
-                    mainContent.classList.remove('sidebar-open');
-                });
-            }
-        });
-    </script>
-</body>
+    {% endfor %} {% endif %}
+  </body>
 </html>
