@@ -10,17 +10,24 @@
     
     <style>
         /* =========================================================
-           1. CONFIGURACIÓN DE PÁGINA Y MÁRGENES ESTRICTOS (CARTA)
+           1. ESTILOS DE PÁGINA SEGÚN LA PASADA
            ========================================================= */
+        {% if seccion == 'inicio' %}
+        /* PASO 1: Portada e Índice -> Margen 0 total */
         @page {
-            size: letter portrait; /* 215.9mm x 279.4mm */
-            margin: 18mm 10mm 18mm 10mm; /* 18mm Top/Bottom garantizan zona para cabecera y pie */
+            size: letter portrait;
+            margin: 0 !important;
         }
-
-        /* La portada es la única página full bleed (sin márgenes) */
-        @page :first {
-            margin: 0 !important; 
+        {% else %}
+        /* PASO 2: Productos -> Separación de 28mm para el Logo ECOSA */
+        @page {
+            size: letter portrait;
+            margin-top: 28mm;
+            margin-bottom: 18mm;
+            margin-left: 10mm;
+            margin-right: 10mm;
         }
+        {% endif %}
 
         * {
             -webkit-print-color-adjust: exact !important;
@@ -34,13 +41,11 @@
             margin: 0;
             padding: 0;
             font-size: 8pt;
-            line-height: 1.25;
+            line-height: 1.2;
             background: #ffffff;
         }
 
-        /* =========================================================
-           2. PORTADA
-           ========================================================= */
+        /* PORTADA */
         .portada-contenedor {
             page-break-after: always;
             break-after: page;
@@ -52,7 +57,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
             background-color: #ffffff;
         }
 
@@ -64,27 +68,13 @@
             display: block;
         }
 
-        /* =========================================================
-           3. LOGO EN CABECERA (ARRIBA IZQUIERDA Y COMPLETO)
-           ========================================================= */
-        .logo-ecosa {
-            position: fixed;
-            top: -14mm; /* Se posiciona dentro del espacio reservado de 18mm superior */
-            left: 0mm;
-            height: 11mm;
-            width: auto;
-            z-index: 999;
-        }
-
-        /* =========================================================
-           4. ÍNDICE DE CONTENIDOS (EVITA TÍTULO HUÉRFANO)
-           ========================================================= */
+        /* ÍNDICE */
         .indice-contenedor {
             page-break-after: always;
             break-after: page;
-            page-break-inside: avoid; /* Evita que el contenedor del índice se rompa en dos si cabe en una página */
-            break-inside: avoid;
-            padding-top: 2mm;
+            padding: 15mm 10mm;
+            box-sizing: border-box;
+            height: 100vh;
         }
         
         .indice-titulo {
@@ -98,7 +88,7 @@
             margin-bottom: 16px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            page-break-after: avoid; /* OBLIGATORIO: Mantiene el título unido al contenido */
+            page-break-after: avoid;
             break-after: avoid;
         }
         
@@ -150,9 +140,7 @@
             top: 5px;
         }
 
-        .indice-familia-nombre {
-            white-space: nowrap;
-        }
+        .indice-familia-nombre { white-space: nowrap; }
 
         .indice-puntos {
             flex: 1 1 auto;
@@ -169,23 +157,19 @@
             white-space: nowrap;
         }
 
-        /* =========================================================
-           5. PRODUCTOS Y SECCIONES
-           ========================================================= */
+        /* PRODUCTOS Y SECCIONES */
         .seccion-familia {
             margin-bottom: 10px;
-            page-break-inside: avoid;
-            break-inside: avoid;
         }
 
         .titulo-familia {
-            font-size: 12pt;
+            font-size: 11.5pt;
             font-weight: bold;
             color: #1c960c;
             border-bottom: 2px solid #27e757;
             padding-bottom: 2px;
             margin-bottom: 6px;
-            margin-top: 2px;
+            margin-top: 4px;
             page-break-after: avoid;
             break-after: avoid;
         }
@@ -193,16 +177,16 @@
         .grid-productos {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 5px;
             justify-content: flex-start;
             width: 100%;
         }
 
         .tarjeta-producto {
-            width: calc(33.333% - 4px);
+            width: calc(33.333% - 3.5px);
             border: 1px solid #cbd5e1;
             border-radius: 4px;
-            padding: 5px;
+            padding: 4px;
             page-break-inside: avoid;
             break-inside: avoid;
             background-color: #ffffff;
@@ -212,8 +196,8 @@
             width: 100%;
             border: 1px solid #cbd5e1;
             border-radius: 4px;
-            padding: 6px;
-            margin-bottom: 6px;
+            padding: 5px;
+            margin-bottom: 5px;
             background-color: #ffffff;
             page-break-inside: avoid;
             break-inside: avoid;
@@ -221,45 +205,45 @@
 
         .imagen-producto {
             width: 100%;
-            height: 90px;
+            height: 85px;
             object-fit: contain;
             background-color: white;
             border-radius: 3px;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .titulo-producto {
-            font-size: 8.5pt;
+            font-size: 8pt;
             font-weight: bold;
             color: #0f172a;
-            margin: 0 0 3px 0;
+            margin: 0 0 2px 0;
             text-align: center;
         }
 
         .desc-producto {
-            font-size: 6.8pt;
+            font-size: 6.5pt;
             color: #475569;
             text-align: center;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .tabla-variantes {
             width: 100%;
             border-collapse: collapse;
-            font-size: 6.5pt;
+            font-size: 6.2pt;
         }
 
         .tabla-variantes th {
             background-color: #f1f5f9;
             color: #334155;
-            padding: 2px 3px;
+            padding: 1.5px 2px;
             text-align: left;
             border-bottom: 1px solid #cbd5e1;
             font-weight: bold;
         }
 
         .tabla-variantes td {
-            padding: 2px 3px;
+            padding: 1.5px 2px;
             border-bottom: 1px solid #f1f5f9;
             color: #334155;
         }
@@ -272,6 +256,7 @@
 </head>
 <body>
 
+    {% if seccion == 'inicio' or not seccion %}
     <div class="portada-contenedor">
         {% if portada_base64 %}
             <img src="{{ portada_base64 }}" alt="Portada Catálogo">
@@ -281,10 +266,6 @@
             </div>
         {% endif %}
     </div>
-
-    {% if logo_base64 %}
-        <img src="{{ logo_base64 }}" alt="Logo Ecosa" class="logo-ecosa">
-    {% endif %}
 
     <div class="indice-contenedor">
         <h2 class="indice-titulo">Índice de Contenidos</h2>
@@ -296,18 +277,20 @@
                         <li>
                             <span class="indice-familia-nombre">{{ familia }}</span>
                             <span class="indice-puntos"></span>
-                            <span class="indice-pagina">{{ paginas|dictget:marca|dictget:familia|default:"—" }}</span>
+                            <span class="indice-pagina" data-target-page="sec-{{ marca|slugify }}-{{ familia|slugify }}">—</span>
                         </li>
                     {% endfor %}
                 </ul>
             {% endfor %}
         </div>
     </div>
+    {% endif %}
 
+    {% if seccion == 'productos' or not seccion %}
     {% for marca, familias in catalogo.items %}
     <div>
         {% for familia, grupos in familias.items %}
-        <div class="seccion-familia">
+        <div class="seccion-familia" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
             <div class="titulo-familia">{{ marca }} - {{ familia }}</div>
 
             <div class="grid-productos">
@@ -368,6 +351,7 @@
         {% endfor %}
     </div>
     {% endfor %}
+    {% endif %}
 
 </body>
 </html>
