@@ -40,294 +40,342 @@
             color: #1e293b;
             margin: 0;
             padding: 0;
-            font-size: 8pt;
-            line-height: 1.2;
             background: #ffffff;
         }
 
         /* PORTADA */
-        .portada-contenedor {
-            page-break-after: always;
-            break-after: page;
+        .portada-container {
             width: 100vw;
             height: 100vh;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
+            page-break-after: always;
             background-color: #ffffff;
         }
-
-        .portada-contenedor img {
-            width: 100vw;
-            height: 100vh;
+        .portada-container img {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            object-position: center;
-            display: block;
         }
 
         /* ÍNDICE */
-        .indice-contenedor {
+        .indice-container {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            padding: 15mm 20mm;
             page-break-after: always;
-            break-after: page;
-            padding: 15mm 10mm;
-            box-sizing: border-box;
-            height: 100vh;
+            background-color: #ffffff;
+            width: 100vw;
+            min-height: 100vh;
         }
-        
         .indice-titulo {
-            font-size: 18pt;
+            font-family: inherit;
+            font-size: 20pt;
             font-weight: bold;
-            color: #1c960c;
+            color: #346800;
+            margin-bottom: 20px;
             text-align: center;
-            border-bottom: 2px solid #27e757;
-            padding-bottom: 6px;
-            margin-top: 0;
-            margin-bottom: 16px;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            page-break-after: avoid;
-            break-after: avoid;
         }
-        
         .indice-columnas {
             column-count: 2;
-            column-gap: 24px;
-            page-break-before: avoid;
-            break-before: avoid;
+            column-gap: 32px;
         }
-        
         .indice-marca {
-            font-size: 11pt;
+            font-family: inherit;
+            font-size: 12pt;
             font-weight: bold;
             color: #0f172a;
-            margin-top: 0;
+            margin-top: 10px;
             margin-bottom: 6px;
-            page-break-after: avoid;
-            break-after: avoid;
-            background-color: #f1f5f9;
-            padding: 3px 6px;
+            background-color: #eaf3e0;
+            padding: 3px 7px;
             border-radius: 4px;
-            border-left: 4px solid #1c960c;
+            border-left: 4px solid #346800;
+            border-bottom: none;
+            break-after: avoid;
         }
-        
         .indice-lista {
+            font-family: inherit;
             list-style: none;
             padding: 0;
-            margin: 0 0 14px 0;
+            margin: 0;
+            font-size: 8pt;
         }
-        
         .indice-lista li {
             display: flex;
+            justify-content: space-between;
             align-items: baseline;
-            font-size: 8pt;
-            color: #475569;
-            padding: 3px 0 3px 10px;
-            border-bottom: 1px dashed #e2e8f0;
-            page-break-inside: avoid;
+            margin-bottom: 3px;
+            padding-bottom: 2px;
+            border-bottom: 1px dashed #d3e5c2;
             break-inside: avoid;
-            position: relative;
+        }
+        .indice-familia-nombre {
+            background: #fff;
+            padding-right: 5px;
+            color: #475569;
+            font-weight: bold;
+        }
+        .indice-puntos {
+            flex-grow: 1;
+            border-bottom: 1px dotted #b3d189;
+            margin: 0 5px;
+        }
+        .indice-pagina {
+            background: #fff;
+            padding-left: 5px;
+            font-weight: bold;
+            color: #346800;
+        }
+
+        /* SECCIONES Y FAMILIAS (Contenido de Productos) */
+        .seccion-familia {
+            margin-bottom: 25px;
+            clear: both;
         }
         
-        .indice-lista li::before {
-            content: "■";
-            color: #27e757;
-            font-size: 4pt;
-            position: absolute;
-            left: 0;
-            top: 5px;
-        }
-
-        .indice-familia-nombre { white-space: nowrap; }
-
-        .indice-puntos {
-            flex: 1 1 auto;
-            border-bottom: 1px dotted #cbd5e1;
-            margin: 0 4px 2px 4px;
-            height: 0;
-        }
-
-        .indice-pagina {
-            font-weight: bold;
-            color: #1c960c;
-            min-width: 14px;
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        /* PRODUCTOS Y SECCIONES */
-        .seccion-familia {
-            margin-bottom: 10px;
-        }
-
         .titulo-familia {
-            font-size: 11.5pt;
+            font-size: 16pt;
             font-weight: bold;
-            color: #1c960c;
-            border-bottom: 2px solid #27e757;
-            padding-bottom: 2px;
-            margin-bottom: 6px;
-            margin-top: 4px;
-            page-break-after: avoid;
+            color: #ffffff;
+            background-color: #346800;
+            padding: 8px 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
             break-after: avoid;
+            display: flex;
+            align-items: center;
+            position: relative; /* Necesario para ocultar la etiqueta detrás */
         }
 
-        .grid-productos {
+        /* SISTEMA PARA OCULTAR LA ETIQUETA SIN BORRARLA DEL PDF (sin tocar) */
+        .etiqueta-rastreo {
+            position: absolute; /* La saca del flujo normal */
+            left: 12px;
+            color: #346800; /* Mismo color del fondo verde: debe coincidir siempre */
+            font-size: 10pt; /* Tamaño normal para que PyMuPDF la lea bien */
+            z-index: 0; /* Queda al fondo */
+        }
+        .texto-titulo {
+            position: relative;
+            z-index: 1; /* El título blanco queda por encima tapando la etiqueta */
+        }
+        
+        .productos-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 5px;
+            gap: 8px;
             justify-content: flex-start;
-            width: 100%;
         }
 
-        .tarjeta-producto {
-            width: calc(33.333% - 3.5px);
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            padding: 4px;
+        /* -----------------------------------------------------------
+           TARJETA DE PRODUCTO: sin bordes, estilo editorial verde.
+           min-height dimensionado para ~9 tarjetas (3x3) por página.
+           ----------------------------------------------------------- */
+        .grupo-tarjeta {
+            width: calc(33.333% - 6px);
+            border: none;
+            padding: 6px 5px;
+            background: #fff;
             page-break-inside: avoid;
             break-inside: avoid;
-            background-color: #ffffff;
+            margin-bottom: 6px;
+            min-height: 75mm;
+            display: flex;
+            flex-direction: column;
         }
-
-        .tarjeta-ancha {
+        
+        .grupo-tarjeta-ancha {
             width: 100%;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            padding: 5px;
-            margin-bottom: 5px;
-            background-color: #ffffff;
+            border: none;
+            padding: 8px 6px;
+            background: #fff;
             page-break-inside: avoid;
             break-inside: avoid;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
         }
-
-        .imagen-producto {
-            width: 100%;
-            height: 85px;
-            object-fit: contain;
-            background-color: white;
-            border-radius: 3px;
-            margin-bottom: 3px;
+        .ancho-header-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
         }
-
-        .titulo-producto {
-            font-size: 8pt;
+        .ancho-header-info {
+            flex: 1;
+            padding-right: 15px;
+        }
+        
+        .grupo-header {
+            text-align: center;
+            margin-bottom: 4px;
+            min-height: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .grupo-titulo {
+            font-size: 9pt;
             font-weight: bold;
             color: #0f172a;
-            margin: 0 0 2px 0;
-            text-align: center;
+            margin: 0 0 1px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
         }
-
-        .desc-producto {
-            font-size: 6.5pt;
-            color: #475569;
-            text-align: center;
-            margin-bottom: 3px;
+        .grupo-desc {
+            font-size: 6.8pt;
+            color: #000000;
+            margin: 0;
+            font-style: italic;
         }
-
-        .tabla-variantes {
+        
+        .grupo-imagen-container {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 6px;
+        }
+        .grupo-imagen-container img {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+        }
+        
+        table {
             width: 100%;
+            border-spacing: 0;
             border-collapse: collapse;
-            font-size: 6.2pt;
+            font-size: 7.8pt;
+            table-layout: fixed;
         }
-
-        .tabla-variantes th {
-            background-color: #f1f5f9;
-            color: #334155;
-            padding: 1.5px 2px;
+        th, td {
+            padding: 3px 3px;
             text-align: left;
-            border-bottom: 1px solid #cbd5e1;
-            font-weight: bold;
         }
-
-        .tabla-variantes td {
-            padding: 1.5px 2px;
-            border-bottom: 1px solid #f1f5f9;
+        th {
+            background-color: transparent;
+            font-weight: bold;
+            color: #346800;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-size: 6.8pt;
+            border-bottom: 1.5px solid #346800;
+        }
+        td {
+            border-bottom: 1px solid #eaf3e0;
             color: #334155;
         }
-
-        .col-precio {
-            font-weight: bold;
-            color: #1c960c;
+        .col-codigo-real {
+            width: 30%;
+            font-weight: 700;
+            color: #0f172a;
+            white-space: nowrap;
         }
+        .col-ref { width: 12%; color: #64748b; }
+        .col-desc { width: 24%; }
+        .col-precio { width: 22%; text-align: right; font-weight: bold; color: #346800; }
     </style>
 </head>
 <body>
 
     {% if seccion == 'inicio' or not seccion %}
-    <div class="portada-contenedor">
+    <div class="portada-container">
         {% if portada_base64 %}
-            <img src="{{ portada_base64 }}" alt="Portada Catálogo">
+            <img src="{{ portada_base64 }}" alt="Portada">
         {% else %}
-            <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
-                <h1 style="color:#1c960c; font-size:32pt; margin:0;">Catálogo Oficial Ecosa</h1>
-            </div>
+            <div style="font-size: 24pt; color: #4d9902; text-align:center; padding-top: 40%;">CATÁLOGO ECOSA 2026</div>
         {% endif %}
     </div>
 
-    <div class="indice-contenedor">
-        <h2 class="indice-titulo">Índice de Contenidos</h2>
+    <div class="indice-container">
+        <div class="indice-titulo">Tabla de Contenidos</div>
         <div class="indice-columnas">
-            {% for marca, familias in catalogo.items %}
-                <div class="indice-marca">{{ marca }}</div>
-                <ul class="indice-lista">
-                    {% for familia, grupos in familias.items %}
-                        <li>
-                            <span class="indice-familia-nombre">{{ familia }}</span>
-                            <span class="indice-puntos"></span>
-                            <span class="indice-pagina" data-target-page="sec-{{ marca|slugify }}-{{ familia|slugify }}">—</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endfor %}
+            {% if indice_datos %}
+                {% for m in indice_datos %}
+                    <div class="indice-marca">{{ m.marca }}</div>
+                    <ul class="indice-lista">
+                        {% for f in m.familias %}
+                            <li>
+                                <a href="#{{ f.id_sec }}" style="text-decoration:none; color:inherit; display:flex; width:100%; align-items:baseline;">
+                                    <span class="indice-familia-nombre">{{ f.nombre }}</span>
+                                    <span class="indice-puntos"></span>
+                                    <span class="indice-pagina">{{ f.pagina }}</span>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endfor %}
+            {% else %}
+                <div style="text-align:center; margin-top:50px; font-style:italic; color:#666;">Generando tabla de contenidos...</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
+
 
     {% if seccion == 'productos' or not seccion %}
     {% for marca, familias in catalogo.items %}
     <div>
         {% for familia, grupos in familias.items %}
         <div class="seccion-familia" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
-            <div class="titulo-familia">{{ marca }} - {{ familia }}</div>
+            
+            <div class="titulo-familia">
+                <span class="etiqueta-rastreo">[[sec-{{ marca|slugify }}-{{ familia|slugify }}]]</span>
+                <span class="texto-titulo">{{ marca }} - {{ familia }}</span>
+            </div>
 
-            <div class="grid-productos">
-                {% for grupo, info in grupos.items %}
-                <div class="{% if info.es_ancha %}tarjeta-ancha{% else %}tarjeta-producto{% endif %}">
+            <div class="productos-grid">
+                {% for grupo_nombre, info in grupos.items %}
+                <div class="{% if info.es_ancha %}grupo-tarjeta-ancha{% else %}grupo-tarjeta{% endif %}">
                     
-                    {% if info.imagen_url %}
-                        <img src="{{ info.imagen_url }}" class="imagen-producto" alt="{{ grupo }}">
+                    {% if info.es_ancha %}
+                        <div class="ancho-header-container">
+                            <div class="grupo-imagen-container" style="width: 100px; height: 100px; margin-bottom:0; margin-right: 15px;">
+                                {% if info.imagen_url %}
+                                    <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+                                {% endif %}
+                            </div>
+                            <div class="ancho-header-info">
+                                <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
+                                {% if info.descripcion %}
+                                    <p class="grupo-desc">{{ info.descripcion }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
                     {% else %}
-                        <div class="imagen-producto" style="display:flex; align-items:center; justify-content:center; background:#f1f5f9; color:#94a3b8;">Sin Imagen</div>
+                        <div class="grupo-header">
+                            <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
+                            {% if info.descripcion %}
+                                <p class="grupo-desc">{{ info.descripcion }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="grupo-imagen-container">
+                            {% if info.imagen_url %}
+                                <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+                            {% endif %}
+                        </div>
                     {% endif %}
 
-                    <h4 class="titulo-producto">{{ grupo }}</h4>
-                    {% if info.descripcion %}
-                        <p class="desc-producto">{{ info.descripcion }}</p>
-                    {% endif %}
-
-                    <table class="tabla-variantes">
+                    <table>
                         <thead>
                             <tr>
-                                {% if sin_precio %}
-                                    <th style="width: 35%;">Código</th>
-                                    <th style="width: 40%;">Detalle</th>
-                                    <th style="width: 25%;">Unidad</th>
-                                {% else %}
-                                    <th style="width: 28%;">Código</th>
-                                    <th style="width: 32%;">Detalle</th>
-                                    <th style="width: 15%;">Unidad</th>
-                                    <th style="width: 25%; text-align: right;">Precio</th>
+                                <th>Código</th>
+                                <th>Ref</th>
+                                <th>Medida</th>
+                                <th>Und</th>
+                                {% if not sin_precio %}
+                                    <th style="text-align: right;">Precio</th>
                                 {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for var in info.variantes %}
                             <tr>
-                                <td class="col-codigo">{{ var.codigo|default:"---" }}</td>
-                                <td class="col-desc">{{ var.descripcion|default:"Estándar" }}</td>
+                                <td class="col-codigo-real">{{ var.codigo|default:"---" }}</td>
+                                <td class="col-ref">{{ var.codigo_de_origen|default:"---" }}</td>
+                                <td class="col-desc">{{ var.medida_mostrar|default:"Estándar" }}</td>
                                 <td class="col-desc">{{ var.unidad_medida|default:"-" }}</td>
                                 
                                 {% if not sin_precio %}

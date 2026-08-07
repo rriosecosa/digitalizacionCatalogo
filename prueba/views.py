@@ -18,11 +18,25 @@ from django.core.exceptions import PermissionDenied
 from django.conf import settings
 from django.templatetags.static import static
 from django.utils.text import slugify
-
+import difflib
 from playwright.sync_api import sync_playwright
 import fitz  # PyMuPDF para la fusión en memoria de los dos pases
 
 from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache
+import os
+import re
+import tempfile
+import fitz  # PyMuPDF
+from datetime import datetime
+from collections import OrderedDict
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
+
+
+
+from django.utils.text import slugify
+
 
 
 # ==========================================
@@ -58,6 +72,50 @@ def obtener_base64_imagen(ruta_imagen):
                 
     return ruta_imagen
 
+import re
+
+def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_origen: str = "") -> str:
+    """
+    Compara el nombre del grupo con la descripción completa de una variante
+    y devuelve solo la parte que difiere (la medida/talla).
+
+    Primero limpia de la descripción el código de proveedor exacto
+    (campo 'codigo_de_origen' del modelo), si viene informado y coincide
+    con el inicio del texto. Como respaldo, también intenta quitar
+    cualquier código numérico suelto al inicio (por si el campo viniera vacío).
+
+    Ej: nombre_grupo = 'GRATA DE COPA TRENZADA FINA'
+        descripcion_variante = '28260 GRATA DE COPA TRENZADA FINA 5"'
+        codigo_de_origen = '28260'
+        -> devuelve: '5"'
+    """
+    if not nombre_grupo or not descripcion_variante:
+        return descripcion_variante or ""
+
+    descripcion_limpia = descripcion_variante.strip()
+
+    # 1. Quitar el código de proveedor exacto, si lo tenemos y calza al inicio
+    if codigo_de_origen:
+        codigo_de_origen = codigo_de_origen.strip()
+        if codigo_de_origen and descripcion_limpia.startswith(codigo_de_origen):
+            descripcion_limpia = descripcion_limpia[len(codigo_de_origen):].strip()
+
+    # 2. Respaldo: si quedó algún código numérico suelto al inicio (ej. codigo_de_origen vacío)
+    descripcion_limpia = re.sub(r'^\d{3,7}\s+', '', descripcion_limpia)
+
+    palabras_grupo = nombre_grupo.split()
+    palabras_variante = descripcion_limpia.split()
+
+    matcher = difflib.SequenceMatcher(None, palabras_grupo, palabras_variante, autojunk=False)
+
+    diferencias = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag in ('insert', 'replace'):
+            diferencias.extend(palabras_variante[j1:j2])
+
+    resultado = " ".join(diferencias).strip(" .,-")
+
+    return resultado if resultado else descripcion_limpia
 
 def obtener_file_uri(imagen_field):
     if not imagen_field:
@@ -121,7 +179,8 @@ def lista_productos(request):
             Q(proveedor__marca__startswith='"') |
             Q(proveedor__marca__iexact='a') |
             Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-            Q(proveedor__marca__iexact='HELA')
+            Q(proveedor__marca__iexact='HELA') |
+            Q(codigo='17-27-105')
         )
     )
 
@@ -293,7 +352,10 @@ def dashboard_productos(request):
         Q(proveedor__marca__startswith='"') |
         Q(proveedor__marca__iexact='a') |
         Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-        Q(proveedor__marca__iexact='HELA')
+        Q(proveedor__marca__iexact='HELA') |
+        Q(codigo='17-27-105')
+
+        
     )
 
     kpi_productos_activos = productos_base_qs.count()
@@ -409,7 +471,8 @@ def menu_exportar(request):
         Q(proveedor__marca__startswith='"') |
         Q(proveedor__marca__iexact='a') |
         Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-        Q(proveedor__marca__iexact='HELA')
+        Q(proveedor__marca__iexact='HELA') |
+        Q(codigo='17-27-105')
     ).order_by('descripcion_grupo')
     
     familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
@@ -527,11 +590,21 @@ def marcar_catalogo_vigente(request, catalogo_id):
 
     messages.success(request, f"Se ha fijado el catálogo Versión {catalogo.version_number} como la versión vigente oficial.")
     return redirect('historial_catalogo')
-
-
-# ==========================================
-# GENERACIÓN PDF (PLAYWRIGHT EN DOS PASES + PYMUPDF)
-# ==========================================
+import os
+import re
+import tempfile
+import fitz  # PyMuPDF
+from datetime import datetime
+from collections import OrderedDict
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.core.files.base import ContentFile
+from django.db.models import Case, When, Value, IntegerField
+from django.utils.text import slugify
+from playwright.sync_api import sync_playwright
 
 @login_required(login_url='/login/')
 @user_passes_test(lambda u: u.is_superuser)
@@ -580,10 +653,8 @@ def generar_pdf(request):
             p.familia_temporal,
             p.descripcion_grupo or p.descripcion or ""
         ))
-
         
         imagenes_dict = {
-            # Usamos .name para pasar solo la ruta relativa (ej: 'productos/foto.jpg')
             img.grupo_nombre: obtener_base64_imagen(img.imagen.name)
             for img in ImagenProducto.objects.all() if img.imagen
         }
@@ -591,7 +662,6 @@ def generar_pdf(request):
         descripciones_dict = {img.grupo_nombre: img.descripcion for img in ImagenProducto.objects.all() if img.descripcion}
 
         UMBRAL_VARIANTES_TARJETA_ANCHA = 8
-
         catalogo = OrderedDict()
         catalogo["Truper"] = OrderedDict()
         catalogo["Otras Marcas"] = OrderedDict()
@@ -612,6 +682,7 @@ def generar_pdf(request):
                     'variantes': []
                 }
 
+            p.medida_mostrar = extraer_medida(grupo, p.descripcion or "", p.codigo_de_origen or "")
             familias_de_marca[familia][grupo]['variantes'].append(p)
 
         catalogo = OrderedDict((k, v) for k, v in catalogo.items() if v)
@@ -625,34 +696,8 @@ def generar_pdf(request):
                     sorted(grupos.items(), key=lambda item: (item[1]['es_ancha'], item[0]))
                 )
 
-        # 2. CATEGORÍA DINÁMICA DE LOS PRODUCTOS SELECCIONADOS
-        categoria_post = request.POST.get('categoria', '').strip()
-        if categoria_post:
-            categoria_general = categoria_post
-        else:
-            familias_presentes = []
-            for familias_de_marca in catalogo.values():
-                for fam in familias_de_marca.keys():
-                    if fam and fam != "Sin Familia" and fam not in familias_presentes:
-                        familias_presentes.append(fam)
-            
-            if familias_presentes:
-                categoria_general = ", ".join(familias_presentes[:2])
-            else:
-                categoria_general = "General"
-
         logo_base64 = obtener_base64_imagen('static/img/logo_ecosa.png')
         portada_base64 = obtener_base64_imagen('static/img/portada.png')
-
-        # 3. RENDERIZADO EN DOS PASES SEPARADOS
-        html_inicio = render_to_string('catalogo_pdf.html', {
-            'catalogo': catalogo,
-            'request': request,
-            'logo_base64': logo_base64,
-            'portada_base64': portada_base64,
-            'sin_precio': sin_precio,
-            'seccion': 'inicio',
-        })
 
         html_productos = render_to_string('catalogo_pdf.html', {
             'catalogo': catalogo,
@@ -663,7 +708,6 @@ def generar_pdf(request):
             'seccion': 'productos',
         })
 
-        # PLANTILLAS PLAYWRIGHT PARA EL PASO 2 (PRODUCTOS)
         header_template = f"""
         <style>
             #header, #footer {{ padding: 0 !important; margin: 0 !important; width: 100%; }}
@@ -683,6 +727,7 @@ def generar_pdf(request):
         </div>
         """
 
+        # DEJAMOS EL CENTRO LIBRE EN EL FOOTER DE PLAYWRIGHT PARA STAMPARLO CON PYMUPDF
         footer_template = f"""
         <style>
             #header, #footer {{ padding: 0 !important; margin: 0 !important; width: 100%; }}
@@ -703,95 +748,189 @@ def generar_pdf(request):
                 Actualizada al {fecha_actualizacion}
             </div>
             <div style="flex: 1; text-align: center;">
-                <span style="color: #D67A00; font-weight: bold;">{codigo_catalogo}</span>
-                <span style="color: #000000; margin-left: 4px;">{categoria_general}</span>
-            </div>
+                </div>
             <div style="flex: 1; text-align: right; color: #444444;">
                 Página <span class="pageNumber"></span> de <span class="totalPages"></span>
             </div>
         </div>
         """
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu'
-                ]
-            )
-            try:
-                # -------------------------------------------------------------
-                # PASO 1: PORTADA E ÍNDICE (0mm margen, SIN HEADER NI FOOTER)
-                # -------------------------------------------------------------
-                page_inicio = browser.new_page()
-                page_inicio.set_content(html_inicio, wait_until="load", timeout=120000)
-                pdf_bytes_inicio = page_inicio.pdf(
-                    format="Letter",
-                    print_background=True,
-                    prefer_css_page_size=True,
-                    display_header_footer=False,
-                    margin={"top": "0mm", "bottom": "0mm", "left": "0mm", "right": "0mm"}
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w', encoding='utf-8') as tmp_file:
+            tmp_file.write(html_productos)
+            tmp_html_productos_path = tmp_file.name
+
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--js-flags=--max-old-space-size=4096'
+                    ]
                 )
-                page_inicio.close()
+                try:
+                    # PASO 1: GENERAR PDF DE PRODUCTOS Y ESCANEAR PÁGINAS REALES
+                    page_productos = browser.new_page()
+                    page_productos.goto(f"file://{tmp_html_productos_path}", wait_until="load", timeout=180000)
 
-                # -------------------------------------------------------------
-                # PASO 2: PRODUCTOS (28mm MARGEN SUPERIOR PARA CABECERA + FOOTER)
-                # -------------------------------------------------------------
-                page_productos = browser.new_page()
-                page_productos.set_content(html_productos, wait_until="load", timeout=120000)
+                    pdf_bytes_productos = page_productos.pdf(
+                        format="Letter",
+                        print_background=True,
+                        prefer_css_page_size=True,
+                        display_header_footer=True,
+                        header_template=header_template,
+                        footer_template=footer_template,
+                        margin={"top": "28mm", "bottom": "18mm", "left": "10mm", "right": "10mm"}
+                    )
+                    page_productos.close()
 
-                page_productos.evaluate("""() => {
-                    const PAGE_HEIGHT_PX = 1056; 
-                    const sections = document.querySelectorAll('.seccion-familia');
-                    sections.forEach(sec => {
-                        const id = sec.getAttribute('id');
-                        if (id) {
-                            const rect = sec.getBoundingClientRect();
-                            const top = rect.top + window.scrollY;
-                            const pageNum = Math.floor(top / PAGE_HEIGHT_PX) + 1;
-                            const targetSpans = document.querySelectorAll(`[data-target-page="${id}"]`);
-                            targetSpans.forEach(span => {
-                                span.textContent = pageNum;
-                            });
-                        }
-                    });
-                }""")
+                    doc_productos = fitz.open(stream=pdf_bytes_productos, filetype="pdf")
+                    page_map = {}
+                    
+                    for i in range(doc_productos.page_count):
+                        page = doc_productos[i]
+                        text = page.get_text("text")
+                        matches = re.findall(r'\[\[(sec-[^\]]+)\]\]', text)
+                        for m in matches:
+                            if m not in page_map:
+                                page_map[m] = i + 1
 
-                pdf_bytes_productos = page_productos.pdf(
-                    format="Letter",
-                    print_background=True,
-                    prefer_css_page_size=True,
-                    display_header_footer=True,
-                    header_template=header_template,
-                    footer_template=footer_template,
-                    margin={
-                        "top": "28mm",     # RESERVA ~105PX PARA EL LOGO ECOSA
-                        "bottom": "18mm",  # RESERVA ESPACIO FOOTER
-                        "left": "10mm",
-                        "right": "10mm"
-                    }
-                )
-                page_productos.close()
+                    # PASO 2: GENERAR PORTADA/ÍNDICE DUMMY PARA CALCULAR OFFSET
+                    html_inicio_dummy = render_to_string('catalogo_pdf.html', {
+                        'catalogo': catalogo,
+                        'request': request,
+                        'logo_base64': logo_base64,
+                        'portada_base64': portada_base64,
+                        'sin_precio': sin_precio,
+                        'seccion': 'inicio',
+                    })
+                    
+                    page_inicio_dummy = browser.new_page()
+                    page_inicio_dummy.set_content(html_inicio_dummy, wait_until="load", timeout=120000)
+                    pdf_dummy = page_inicio_dummy.pdf(
+                        format="Letter", margin={"top": "0mm", "bottom": "0mm", "left": "0mm", "right": "0mm"}
+                    )
+                    page_inicio_dummy.close()
 
-                # FUSIÓN EN MEMORIA CON PYMUPDF
-                doc_inicio = fitz.open(stream=pdf_bytes_inicio, filetype="pdf")
-                doc_productos = fitz.open(stream=pdf_bytes_productos, filetype="pdf")
+                    doc_dummy = fitz.open(stream=pdf_dummy, filetype="pdf")
+                    offset_paginas = doc_dummy.page_count
+                    doc_dummy.close()
 
-                doc_final = fitz.open()
-                doc_final.insert_pdf(doc_inicio)
-                doc_final.insert_pdf(doc_productos)
+                    # PASO 3: PREPARAR DATOS DEL ÍNDICE CON PÁGINAS ABSOLUTAS
+                    indice_datos = []
+                    for marca, familias in catalogo.items():
+                        marcas_data = {'marca': marca, 'familias': []}
+                        for familia in familias.keys():
+                            id_sec = f"sec-{slugify(marca)}-{slugify(familia)}"
+                            pag_relativa = page_map.get(id_sec, 1) 
+                            pag_absoluta = offset_paginas + pag_relativa
+                            
+                            marcas_data['familias'].append({
+                                'nombre': familia,
+                                'id_sec': id_sec,
+                                'pagina': pag_absoluta
+                            })
+                        if marcas_data['familias']:
+                            indice_datos.append(marcas_data)
 
-                pdf_bytes = doc_final.write()
+                    # PASO 4: RE-RENDERIZAR PORTADA/ÍNDICE CON PÁGINAS REALES
+                    html_inicio_final = render_to_string('catalogo_pdf.html', {
+                        'catalogo': catalogo,
+                        'indice_datos': indice_datos,
+                        'request': request,
+                        'logo_base64': logo_base64,
+                        'portada_base64': portada_base64,
+                        'sin_precio': sin_precio,
+                        'seccion': 'inicio',
+                    })
 
-                doc_inicio.close()
-                doc_productos.close()
-                doc_final.close()
+                    page_inicio_final = browser.new_page()
+                    page_inicio_final.set_content(html_inicio_final, wait_until="load", timeout=120000)
+                    pdf_bytes_inicio = page_inicio_final.pdf(
+                        format="Letter",
+                        print_background=True,
+                        prefer_css_page_size=True,
+                        display_header_footer=False,
+                        margin={"top": "0mm", "bottom": "0mm", "left": "0mm", "right": "0mm"}
+                    )
+                    page_inicio_final.close()
 
-            finally:
-                browser.close()
+                    # PASO 5: FUSIÓN FINAL E INYECCIÓN DE HIPERVÍNCULOS
+                    doc_inicio = fitz.open(stream=pdf_bytes_inicio, filetype="pdf")
+                    doc_final = fitz.open()
+                    doc_final.insert_pdf(doc_inicio)
+                    doc_final.insert_pdf(doc_productos)
+                    doc_inicio.close()
+                    doc_productos.close()
+
+                    # Inyección de enlaces interactivos
+                    for m in indice_datos:
+                        for f in m['familias']:
+                            target_page = int(f['pagina']) - 1 
+                            for i in range(offset_paginas):
+                                page = doc_final[i]
+                                areas = page.search_for(f['nombre'])
+                                for rect in areas:
+                                    link = {"kind": fitz.LINK_GOTO, "from": rect, "page": target_page}
+                                    page.insert_link(link)
+
+                    # Menú de Bookmarks Lateral
+                    toc_pdf = []
+                    for m in indice_datos:
+                        toc_pdf.append([1, m['marca'], 1])
+                        for f in m['familias']:
+                            toc_pdf.append([2, f['nombre'], int(f['pagina'])])
+                    doc_final.set_toc(toc_pdf)
+
+                    # -------------------------------------------------------------
+                    # PASO 6: STAMPING DINÁMICO DEL PIE DE PÁGINA (CENTRO POR HOJA)
+                    # -------------------------------------------------------------
+                    hitos_familias = []
+                    for m in indice_datos:
+                        for f in m['familias']:
+                            hitos_familias.append({
+                                'pagina': int(f['pagina']),
+                                'texto': f"{m['marca']} - {f['nombre']}"
+                            })
+                   
+                    hitos_familias.sort(key=lambda x: x['pagina'])
+
+                    def obtener_cat_para_pagina(num_pag):
+                        cat_actual = ""
+                        for h in hitos_familias:
+                            if num_pag >= h['pagina']:
+                                cat_actual = h['texto']
+                            else:
+                                break
+                        return cat_actual
+
+                    # Aplicar únicamente en las hojas de productos
+                    for i in range(offset_paginas, doc_final.page_count):
+                        num_hoja = i + 1
+                        cat_texto = obtener_cat_para_pagina(num_hoja)
+                        if cat_texto:
+                            page = doc_final[i]
+                            rect_centro = fitz.Rect(150, 755, 462, 780)
+                            page.insert_textbox(
+                                rect_centro,
+                                cat_texto,
+                                fontsize=8,
+                                fontname="helv",
+                                color=(0, 0, 0),
+                                align=fitz.TEXT_ALIGN_CENTER
+                            )
+
+                    pdf_bytes = doc_final.write()
+                    doc_final.close()
+
+                finally:
+                    browser.close()
+        finally:
+            if os.path.exists(tmp_html_productos_path):
+                os.remove(tmp_html_productos_path)
 
         fecha_archivo = datetime.now().strftime('%d-%m-%Y')
         
@@ -811,7 +950,6 @@ def generar_pdf(request):
             catalogo_mas_antiguo.delete()
             messages.warning(request, f"Se ha eliminado el catálogo {texto_tipo} más antiguo para liberar espacio.")
 
-        # Guardar en el historial pero con is_current=False para no alterar la versión vigente fijada manualmente
         ultima_version = CatalogCache.objects.order_by('-version_number').first()
         siguiente_version = (ultima_version.version_number + 1) if ultima_version else 1
 

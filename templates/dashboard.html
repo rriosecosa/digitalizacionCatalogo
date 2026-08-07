@@ -223,22 +223,47 @@
         </table>
     </div>
 
-    {% if page_obj.paginator.num_pages > 1 %}
+    {% if page_obj.has_other_pages %}
     <div class="paginacion">
+        {# Botones para ir al Inicio y Anterior #}
         {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">« Anterior</a>
+            <a href="?page=1{% if busqueda %}&q={{ busqueda }}{% endif %}" title="Primera página">« Inicio</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹ Anterior</a>
         {% endif %}
 
+        {# Muestra la página 1 si estamos lejos del inicio #}
+        {% if page_obj.number > 3 %}
+            <a href="?page=1{% if busqueda %}&q={{ busqueda }}{% endif %}">1</a>
+            {% if page_obj.number > 4 %}
+                <span class="dots" style="padding: 8px 6px; color: var(--color-texto-suave); font-weight: 600;">...</span>
+            {% endif %}
+        {% endif %}
+
+        {# Ventana de páginas cercanas a la actual #}
         {% for num in page_obj.paginator.page_range %}
-            {% if num == page_obj.number %}
+            {% if page_obj.number == num %}
                 <span class="active">{{ num }}</span>
-            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                <a href="?page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ num }}</a>
+            {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                {% if num > 1 or page_obj.number <= 3 %}
+                    {% if num < page_obj.paginator.num_pages or page_obj.number >= page_obj.paginator.num_pages|add:"-2" %}
+                        <a href="?page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ num }}</a>
+                    {% endif %}
+                {% endif %}
             {% endif %}
         {% endfor %}
 
+        {# Muestra la última página si estamos lejos del final #}
+        {% if page_obj.number < page_obj.paginator.num_pages|add:"-2" %}
+            {% if page_obj.number < page_obj.paginator.num_pages|add:"-3" %}
+                <span class="dots" style="padding: 8px 6px; color: var(--color-texto-suave); font-weight: 600;">...</span>
+            {% endif %}
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ page_obj.paginator.num_pages }}</a>
+        {% endif %}
+
+        {# Botones para Siguiente y Fin #}
         {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">Siguiente »</a>
+            <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">Siguiente ›</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if busqueda %}&q={{ busqueda }}{% endif %}" title="Última página">Fin ({{ page_obj.paginator.num_pages }}) »</a>
         {% endif %}
     </div>
     {% endif %}

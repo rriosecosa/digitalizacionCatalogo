@@ -1,62 +1,70 @@
 import os
 import sys
 import django
+from django.db import connection
 
-# 1. Configurar el entorno de Django (Asegúrate de que 'pruebabd' sea el nombre de tu proyecto)
+# 1. Configurar el entorno de Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pruebabd.settings')
 django.setup()
 
-from prueba.models import VistaProductoAgrupado, ImagenProducto
+from prueba.models import ImagenProducto
 
 def vincular_imagenes_automatico():
     print("--- INICIANDO VINCULACIÓN MASIVA DE IMÁGENES ---")
     
-    # Ruta directa a la carpeta donde extrajiste las fotos
     carpeta_img = os.path.join('media', 'productos')
     
     if not os.path.exists(carpeta_img):
         print(f"❌ Error: No se encontró la carpeta {carpeta_img}")
         return
 
-    # Leer todos los archivos de la carpeta
     archivos = os.listdir(carpeta_img)
     vinculados = 0
+    omitidos = 0
 
     for archivo in archivos:
-        # Filtrar solo imágenes
-        if archivo.lower().endswith(('.png', '.jpg', '.jpeg')):
-            # Extraer el código del nombre del archivo (ej: 11-11-111.png -> 11-11-111)
-            codigo_producto = os.path.splitext(archivo)[0]
+        if archivo.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            codigo_producto = os.path.splitext(archivo)[0].strip()
 
             try:
-                # 2. Buscar si existe algún producto con ese código en la vista agrupada
-                producto = VistaProductoAgrupado.objects.filter(codigo=codigo_producto).first()
-
-                if producto:
-                    # 3. Identificar el grupo de ese producto
-                    grupo_nombre = producto.descripcion_grupo or producto.descripcion
+                # 2. BUSCAR EN LA TABLA BASE MEDIANTE SQL
+                # Se utiliza r"""...""" para evitar advertencias de sintaxis con \d y \s
+                with connection.cursor() as cursor:
+                    cursor.execute(r"""
+                        SELECT TRIM(BOTH FROM regexp_replace(
+                            regexp_replace(
+                                regexp_replace(upper((descripcion)::text), '\d+\s/\s*\d+"|\d+"|\d+\s*[Xx]\s*\d+\s*[Xx]\s*\d+|\d+\s*[Xx]\s*\d+|\d+\s CM|\d+\s MT|\d+\s ML|\d+\s L\y|\d+\s GR|\d+\sG\y|G\d+|\y\d+\y'::text, ''::text, 'g'::text), '[- /()]'::text, ' '::text, 'g'::text
+                            ), 
+                            '\s+'::text, ' '::text, 'g'::text
+                        )) 
+                        FROM producto 
+                        WHERE codigo = %s
+                        LIMIT 1
+                    """, [codigo_producto])
                     
-                    if grupo_nombre:
-                        # 4. Vincular la ruta relativa a la tabla ImagenProducto
-                        ruta_relativa = f'productos/{archivo}'
-                        
-                        # update_or_create actualizará el grupo si ya existe, o lo creará si es nuevo
-                        ImagenProducto.objects.update_or_create(
-                            grupo_nombre=grupo_nombre,
-                            defaults={'imagen': ruta_relativa}
-                        )
-                        vinculados += 1
-                        print(f"✅ Éxito: Foto '{archivo}' vinculada al grupo -> {grupo_nombre}")
+                    row = cursor.fetchone()
+
+                if row and row[0]:
+                    grupo_nombre = row[0]
+                    ruta_relativa = f'productos/{archivo}'
+                    
+                    ImagenProducto.objects.update_or_create(
+                        grupo_nombre=grupo_nombre,
+                        defaults={'imagen': ruta_relativa}
+                    )
+                    vinculados += 1
+                    print(f"✅ Éxito: Foto '{archivo}' vinculada al grupo -> {grupo_nombre}")
                 else:
-                    print(f"⚠️ Omisión: No se encontró el código {codigo_producto} en la base de datos.")
+                    omitidos += 1
+                    print(f"⚠️ Omisión: No se encontró el código '{codigo_producto}' en la base de datos.")
 
             except Exception as e:
-                # Captura errores de codificación o de base de datos sin detener el bucle
                 print(f"❌ Error procesando el código {codigo_producto}: {e}")
 
-    print(f"\n--- PROCESO TERMINADO: {vinculados} grupos actualizados con éxito ---")
+    print(f"\n--- PROCESO TERMINADO ---")
+    print(f"✅ Grupos actualizados: {vinculados}")
+    print(f"⚠️ Imágenes ignoradas por no existir código: {omitidos}")
 
 if __name__ == '__main__':
-    # Forzar la consola a usar UTF-8 para evitar caídas visuales en Windows
     sys.stdout.reconfigure(encoding='utf-8')
     vincular_imagenes_automatico()
