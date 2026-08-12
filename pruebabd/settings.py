@@ -75,7 +75,6 @@ WSGI_APPLICATION = "pruebabd.wsgi.application"
 # --------------------------------------------------
 # Base de datos (Neon PostgreSQL)
 # --------------------------------------------------
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -84,12 +83,8 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", cast=int),
-        "OPTIONS": {
-            "sslmode": "require",
-        },
     }
 }
-
 # --------------------------------------------------
 # Validadores
 # --------------------------------------------------
@@ -176,3 +171,4 @@ LOGIN_REDIRECT_URL = 'dashboard'
 
 # Aumentamos el límite de campos para permitir el envío del catálogo Ecosa completo
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+

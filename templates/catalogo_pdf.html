@@ -72,7 +72,7 @@
             font-family: inherit;
             font-size: 20pt;
             font-weight: bold;
-            color: #346800;
+            color: #1c960c;
             margin-bottom: 20px;
             text-align: center;
             text-transform: uppercase;
@@ -91,7 +91,7 @@
             background-color: #eaf3e0;
             padding: 3px 7px;
             border-radius: 4px;
-            border-left: 4px solid #346800;
+            border-left: 4px solid #1c960c;
             border-bottom: none;
             break-after: avoid;
         }
@@ -126,7 +126,7 @@
             background: #fff;
             padding-left: 5px;
             font-weight: bold;
-            color: #346800;
+            color: #1c960c;
         }
 
         /* SECCIONES Y FAMILIAS (Contenido de Productos) */
@@ -139,27 +139,26 @@
             font-size: 16pt;
             font-weight: bold;
             color: #ffffff;
-            background-color: #346800;
+            background-color: #1c960c;
             padding: 8px 12px;
             margin-bottom: 15px;
             border-radius: 4px;
             break-after: avoid;
             display: flex;
             align-items: center;
-            position: relative; /* Necesario para ocultar la etiqueta detrás */
+            position: relative;
         }
 
-        /* SISTEMA PARA OCULTAR LA ETIQUETA SIN BORRARLA DEL PDF (sin tocar) */
         .etiqueta-rastreo {
-            position: absolute; /* La saca del flujo normal */
+            position: absolute;
             left: 12px;
-            color: #346800; /* Mismo color del fondo verde: debe coincidir siempre */
-            font-size: 10pt; /* Tamaño normal para que PyMuPDF la lea bien */
-            z-index: 0; /* Queda al fondo */
+            color: #1c960c;
+            font-size: 10pt;
+            z-index: 0;
         }
         .texto-titulo {
             position: relative;
-            z-index: 1; /* El título blanco queda por encima tapando la etiqueta */
+            z-index: 1;
         }
         
         .productos-grid {
@@ -169,10 +168,7 @@
             justify-content: flex-start;
         }
 
-        /* -----------------------------------------------------------
-           TARJETA DE PRODUCTO: sin bordes, estilo editorial verde.
-           min-height dimensionado para ~9 tarjetas (3x3) por página.
-           ----------------------------------------------------------- */
+        /* TARJETA DE PRODUCTO */
         .grupo-tarjeta {
             width: calc(33.333% - 6px);
             border: none;
@@ -247,159 +243,174 @@
             width: 100%;
             border-spacing: 0;
             border-collapse: collapse;
-            font-size: 7.8pt;
+            font-size: 7.2pt; 
             table-layout: fixed;
         }
         th, td {
-            padding: 3px 3px;
+            padding: 3px 1px;
             text-align: left;
         }
         th {
             background-color: transparent;
             font-weight: bold;
-            color: #346800;
+            color: #1c960c;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-size: 6.8pt;
-            border-bottom: 1.5px solid #346800;
+            letter-spacing: 0; 
+            font-size: 6.5pt; 
+            border-bottom: 1.5px solid #1c960c;
         }
         td {
             border-bottom: 1px solid #eaf3e0;
             color: #334155;
         }
-        .col-codigo-real {
-            width: 30%;
-            font-weight: 700;
-            color: #0f172a;
+        .col-codigo-real, .col-ref, .col-medida, .col-inner, .col-precio {
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .col-ref { width: 12%; color: #64748b; }
-        .col-desc { width: 24%; }
-        .col-precio { width: 22%; text-align: right; font-weight: bold; color: #346800; }
+        
+        .col-codigo-real { width: 29%; }
+        .col-ref { width: 16%; }
+        .col-medida { width: 22%; white-space: normal; }
+        .col-inner { width: 13%; } 
+        .col-precio { width: 20%; text-align: right; }
+
+        td.col-codigo-real { font-weight: 700; color: #0f172a; }
+        td.col-ref { color: #64748b; }
+        td.col-precio { font-weight: bold; color: #1c960c; }
     </style>
 </head>
 <body>
 
-    {% if seccion == 'inicio' or not seccion %}
-    <div class="portada-container">
-        {% if portada_base64 %}
-            <img src="{{ portada_base64 }}" alt="Portada">
+{% if seccion == 'inicio' or not seccion %}
+<div class="portada-container">
+    {% if portada_base64 %}
+        <img src="{{ portada_base64 }}" alt="Portada">
+    {% else %}
+        <div style="font-size: 24pt; color: #4d9902; text-align:center; padding-top: 40%;">CATÁLOGO ECOSA 2026</div>
+    {% endif %}
+</div>
+
+<div class="indice-container">
+    <div class="indice-titulo">Tabla de Contenidos</div>
+    <div class="indice-columnas">
+        {% if indice_datos %}
+            {% for m in indice_datos %}
+                <div class="indice-marca">{{ m.marca }}</div>
+                <ul class="indice-lista">
+                    {% for f in m.familias %}
+                        <li>
+                            <a href="#{{ f.id_sec }}" style="text-decoration:none; color:inherit; display:flex; width:100%; align-items:baseline;">
+                                <span class="indice-familia-nombre">{{ f.nombre }}</span>
+                                <span class="indice-puntos"></span>
+                                <span class="indice-pagina">{{ f.pagina }}</span>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endfor %}
         {% else %}
-            <div style="font-size: 24pt; color: #4d9902; text-align:center; padding-top: 40%;">CATÁLOGO ECOSA 2026</div>
+            <div style="text-align:center; margin-top:50px; font-style:italic; color:#666;">Generando tabla de contenidos...</div>
         {% endif %}
     </div>
+</div>
+{% endif %}
 
-    <div class="indice-container">
-        <div class="indice-titulo">Tabla de Contenidos</div>
-        <div class="indice-columnas">
-            {% if indice_datos %}
-                {% for m in indice_datos %}
-                    <div class="indice-marca">{{ m.marca }}</div>
-                    <ul class="indice-lista">
-                        {% for f in m.familias %}
-                            <li>
-                                <a href="#{{ f.id_sec }}" style="text-decoration:none; color:inherit; display:flex; width:100%; align-items:baseline;">
-                                    <span class="indice-familia-nombre">{{ f.nombre }}</span>
-                                    <span class="indice-puntos"></span>
-                                    <span class="indice-pagina">{{ f.pagina }}</span>
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endfor %}
-            {% else %}
-                <div style="text-align:center; margin-top:50px; font-style:italic; color:#666;">Generando tabla de contenidos...</div>
-            {% endif %}
+
+{% if seccion == 'productos' or not seccion %}
+{% for marca, familias in catalogo.items %}
+<div>
+    {% for familia, grupos in familias.items %}
+    <div class="seccion-familia" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
+        
+        <div class="titulo-familia">
+            <span class="etiqueta-rastreo">[[sec-{{ marca|slugify }}-{{ familia|slugify }}]]</span>
+            <span class="texto-titulo">{{ marca }} - {{ familia }}</span>
         </div>
-    </div>
-    {% endif %}
 
-
-    {% if seccion == 'productos' or not seccion %}
-    {% for marca, familias in catalogo.items %}
-    <div>
-        {% for familia, grupos in familias.items %}
-        <div class="seccion-familia" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
-            
-            <div class="titulo-familia">
-                <span class="etiqueta-rastreo">[[sec-{{ marca|slugify }}-{{ familia|slugify }}]]</span>
-                <span class="texto-titulo">{{ marca }} - {{ familia }}</span>
-            </div>
-
-            <div class="productos-grid">
-                {% for grupo_nombre, info in grupos.items %}
-                <div class="{% if info.es_ancha %}grupo-tarjeta-ancha{% else %}grupo-tarjeta{% endif %}">
-                    
-                    {% if info.es_ancha %}
-                        <div class="ancho-header-container">
-                            <div class="grupo-imagen-container" style="width: 100px; height: 100px; margin-bottom:0; margin-right: 15px;">
-                                {% if info.imagen_url %}
-                                    <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
-                                {% endif %}
-                            </div>
-                            <div class="ancho-header-info">
-                                <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
-                                {% if info.descripcion %}
-                                    <p class="grupo-desc">{{ info.descripcion }}</p>
-                                {% endif %}
-                            </div>
+        <div class="productos-grid">
+            {% for grupo_nombre, info in grupos.items %}
+            <div class="{% if info.es_ancha %}grupo-tarjeta-ancha{% else %}grupo-tarjeta{% endif %}">
+                
+                {% if info.es_ancha %}
+                    <div class="ancho-header-container">
+                        <div class="grupo-imagen-container" style="width: 100px; height: 100px; margin-bottom:0; margin-right: 15px;">
+                            {% if info.imagen_url %}
+                                <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <div class="grupo-header">
+                        <div class="ancho-header-info">
                             <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
                             {% if info.descripcion %}
                                 <p class="grupo-desc">{{ info.descripcion }}</p>
                             {% endif %}
                         </div>
-                        <div class="grupo-imagen-container">
-                            {% if info.imagen_url %}
-                                <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+                    </div>
+                {% else %}
+                    <div class="grupo-header">
+                        <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
+                        {% if info.descripcion %}
+                            <p class="grupo-desc">{{ info.descripcion }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="grupo-imagen-container">
+                        {% if info.imagen_url %}
+                            <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-codigo-real">Código</th>
+                            <th class="col-ref">Ref</th>
+                            <th class="col-medida">Medida</th>
+                            {% if info.tiene_empaque_inner %}
+                                <th class="col-inner">Min</th>
                             {% endif %}
-                        </div>
-                    {% endif %}
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Ref</th>
-                                <th>Medida</th>
-                                <th>Und</th>
-                                {% if not sin_precio %}
-                                    <th style="text-align: right;">Precio</th>
+                            {% if not sin_precio %}
+                                <th class="col-precio">Precio</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for var in info.variantes %}
+                        <tr>
+                            <td class="col-codigo-real">{{ var.codigo|default:"---" }}</td>
+                            <td class="col-ref">{{ var.codigo_de_origen|default:"---" }}</td>
+                            <td class="col-medida">
+                                {% if info.variantes|length > 1 %}
+                                    {{ var.medida_mostrar|default:"--" }}
+                                {% else %}
+                                    --
                                 {% endif %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for var in info.variantes %}
-                            <tr>
-                                <td class="col-codigo-real">{{ var.codigo|default:"---" }}</td>
-                                <td class="col-ref">{{ var.codigo_de_origen|default:"---" }}</td>
-                                <td class="col-desc">{{ var.medida_mostrar|default:"Estándar" }}</td>
-                                <td class="col-desc">{{ var.unidad_medida|default:"-" }}</td>
-                                
-                                {% if not sin_precio %}
-                                <td class="col-precio" style="text-align: right;">
-                                    {% if var.precio_base_pesos %}
-                                        ${{ var.precio_base_pesos|floatformat:0 }}
-                                    {% else %}
-                                        ---
-                                    {% endif %}
-                                </td>
+                            </td>
+                            {% if info.tiene_empaque_inner %}
+                                <td class="col-inner">{{ var.empaque_inner|default:"-" }}</td>
+                            {% endif %}
+                            {% if not sin_precio %}
+                            <td class="col-precio" style="text-align: right;">
+                                {% if var.precio_base_pesos %}
+                                    ${{ var.precio_base_pesos|floatformat:0 }}
+                                {% else %}
+                                    ---
                                 {% endif %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
 
-                </div>
-                {% endfor %}
             </div>
+            {% endfor %}
         </div>
-        {% endfor %}
     </div>
     {% endfor %}
-    {% endif %}
+</div>
+{% endfor %}
+{% endif %}
 
 </body>
 </html>

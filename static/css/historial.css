@@ -8,7 +8,7 @@
   --bg-light: #f8fafc;
   --text-main: #334155;
   --text-muted: #64748b;
-  --sidebar-width: 280px; /* Un poco más ancho para más comodidad */
+  --sidebar-width: 280px;
   --transition-speed: 0.3s;
 }
 
@@ -212,8 +212,8 @@ body {
 }
 
 .table > :not(caption) > * > * {
-  padding: 1.2rem 1.5rem;
-  vertical-align: middle;
+  padding: 1rem 1.25rem;
+  vertical-align: middle !important;
 }
 
 .table-light th {
@@ -235,48 +235,64 @@ tbody tr:hover {
 }
 
 /* =========================================
-   BOTONES DE ACCIÓN (Historial)
+   BOTONES DE ACCIÓN MEJORADOS (Alineados)
 ========================================= */
 .btn-action {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-  border: none;
-  font-size: 0.9rem;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.5rem 0.9rem !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 0.825rem !important;
+  white-space: nowrap !important; /* Evita que el texto se rompa en dos líneas */
+  transition: all 0.2s ease !important;
+  border: 1px solid transparent !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  line-height: 1.2 !important;
 }
 
-/* Descargar (Azul) */
+/* Descargar (Azul Elegante) */
 .btn-download {
-  color: #0d6efd;
-  background: rgba(13, 110, 253, 0.1);
+  color: #0284c7 !important;
+  background-color: #f0f9ff !important;
+  border-color: #e0f2fe !important;
 }
 .btn-download:hover {
-  background: rgba(13, 110, 253, 0.2);
-  transform: translateY(-2px);
+  color: #ffffff !important;
+  background-color: #0284c7 !important;
+  border-color: #0284c7 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.2);
 }
 
-/* Marcar Vigente (Verde) */
+/* Marcar Vigente (Verde Esmeralda) */
 .btn-vigente {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.1);
+  color: #059669 !important;
+  background-color: #ecfdf5 !important;
+  border-color: #d1fae5 !important;
 }
 .btn-vigente:hover {
-  background: rgba(16, 185, 129, 0.2);
-  transform: translateY(-2px);
+  color: #ffffff !important;
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.2);
 }
 
-/* Eliminar (Rojo) */
+/* Eliminar (Rojo Suave) */
 .btn-delete {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.1);
+  color: #dc2626 !important;
+  background-color: #fef2f2 !important;
+  border-color: #fee2e2 !important;
 }
 .btn-delete:hover {
-  background: rgba(220, 53, 69, 0.2);
-  transform: translateY(-2px);
+  color: #ffffff !important;
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
 }
 
 /* =========================================

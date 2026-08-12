@@ -2,18 +2,19 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="{% static 'css/detalle.css' %}">
-<title>Detalle - {{ nombre_grupo }}</title>
-<link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
-
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/detalle.css' %}">
+    <title>Detalle - {{ nombre_grupo }}</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
 </head>
 <body>
 
 <div class="container">
-    <a href="{% url 'productos' %}" class="volver">← Volver al catálogo</a>
+    <a href="{% url 'productos' %}" class="volver">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Volver al catálogo
+    </a>
     
     <div class="header-detalle">
         {% if marca %}
@@ -21,31 +22,39 @@
         {% endif %}
         <h1>{{ nombre_grupo }}</h1>
         {% if producto_base.familia %}
-            <p style="color: var(--color-texto-suave); margin: 5px 0 0 0; font-size: 0.9rem;">Familia: {{ producto_base.familia.descripcion }}</p>
+            <p class="familia">Familia: {{ producto_base.familia.descripcion }}</p>
         {% endif %}
     </div>
 
-    <div style="display: flex; gap: 25px; margin-bottom: 30px; align-items: flex-start; flex-wrap: wrap;">
+    <div class="product-layout">
         {% if imagen_url %}
-        <div style="flex-shrink: 0; width: 220px; border: 1px solid var(--color-borde); border-radius: var(--radio); overflow: hidden; background: #fff; padding: 10px;">
-            <img src="{{ imagen_url }}" alt="{{ nombre_grupo }}" style="width: 100%; height: auto; display: block; border-radius: 6px;">
+        <div class="product-image-wrapper">
+            <img src="{{ imagen_url }}" alt="{{ nombre_grupo }}" class="product-image">
         </div>
         {% endif %}
 
         {% if descripcion_grupo %}
-        <div style="flex-grow: 1; min-width: 250px; background: #f9fafb; padding: 20px; border-radius: var(--radio); border: 1px solid var(--color-borde);">
-            <h4 style="margin-top: 0; color: var(--color-primario); margin-bottom: 10px; font-size: 1.1rem;">Descripción del Producto</h4>
-            <p style="margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--color-texto);">{{ descripcion_grupo|linebreaksbr }}</p>
+        <div class="product-desc">
+            <h4>Descripción del Producto</h4>
+            <p>{{ descripcion_grupo|linebreaksbr }}</p>
         </div>
         {% endif %}
     </div>
-    <h3>Medidas y Variantes Disponibles:</h3>
+
+    <h3>Variantes Disponibles</h3>
     <div class="table-wrapper">
         <table>
             <thead>
                 <tr>
                     <th>Código Interno</th>
                     <th>Descripción de Medida</th>
+                    
+                    {% if producto_base.empaque_inner or producto_base.empaque_master or producto_base.empaque_pallet %}
+                        <th>Inner</th>
+                        <th>Master</th>
+                        <th>Pallet</th>
+                    {% endif %}
+                    
                     <th>Precio Base</th>
                 </tr>
             </thead>
@@ -54,11 +63,18 @@
                 <tr>
                     <td><span class="text-mono">{{ var.codigo|default:"---" }}</span></td>
                     <td>{{ var.descripcion }}</td>
+                    
+                    {% if producto_base.empaque_inner or producto_base.empaque_master or producto_base.empaque_pallet %}
+                        <td>{{ var.empaque_inner|default:"-" }}</td>
+                        <td>{{ var.empaque_master|default:"-" }}</td>
+                        <td>{{ var.empaque_pallet|default:"-" }}</td>
+                    {% endif %}
+                    
                     <td class="precio">
                         {% if var.precio_base_pesos %}
                             ${{ var.precio_base_pesos|floatformat:0 }}
                         {% else %}
-                            Consultar precio
+                            <span class="consultar">Consultar precio</span>
                         {% endif %}
                     </td>
                 </tr>

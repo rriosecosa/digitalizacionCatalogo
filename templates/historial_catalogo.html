@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'css/historial.css' %}">
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
-
 </head>
 <body>
 
@@ -116,20 +115,20 @@
                                     <th>Versión</th>
                                     <th>Fecha de Generación</th>
                                     <th>Estado</th>
-                                    <th class="text-end">Acciones</th>
+                                    <th class="text-end" style="min-width: 320px;">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in catalogos_con_precio %}
                                 <tr>
                                     <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-light text-success rounded-circle me-3 p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <div class="d-flex align-items-center my-auto">
+                                            <div class="bg-light text-success rounded-circle me-3 p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 40px;">
                                                 <i class="fas fa-file-pdf fa-lg"></i>
                                             </div>
-                                            <div>
-                                                <span class="fw-bold d-block text-dark">Versión #{{ item.version_number }}</span>
-                                                <small class="text-muted">PDF Con Precio</small>
+                                            <div class="d-flex flex-column justify-content-center">
+                                                <span class="fw-bold d-block text-dark lh-sm">Versión #{{ item.version_number }}</span>
+                                                <small class="text-muted lh-sm mt-1">PDF Con Precio</small>
                                             </div>
                                         </div>
                                     </td>
@@ -148,21 +147,31 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
-                                        <div class="btn-group gap-1">
+                                        <div class="d-inline-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                             {% if request.user.is_superuser and not item.is_current %}
-                                            <form action="{% url 'marcar_catalogo_vigente' item.id %}" method="POST" class="d-inline">
+                                            <form action="{% url 'marcar_catalogo_vigente' item.id %}" method="POST" class="d-inline m-0">
                                                 {% csrf_token %}
-                                                <button type="submit" class="btn btn-outline-success btn-sm" title="Marcar como Vigente">
-                                                    <i class="fas fa-star me-1"></i> Marcar Vigente
+                                                <button type="submit" class="btn btn-action btn-vigente" title="Marcar como Vigente">
+                                                    <i class="fas fa-star me-1"></i> Vigente
                                                 </button>
                                             </form>
                                             {% endif %}
+
                                             {% if item.pdf_file %}
-                                            <a href="{{ item.pdf_file.url }}" class="btn btn-primary btn-sm" target="_blank" download title="Descargar PDF">
+                                            <a href="{{ item.pdf_file.url }}" class="btn btn-action btn-download" target="_blank" download title="Descargar PDF">
                                                 <i class="fas fa-download me-1"></i> Descargar
                                             </a>
                                             {% else %}
                                             <button class="btn btn-secondary btn-sm" disabled>No disponible</button>
+                                            {% endif %}
+
+                                            {% if request.user.is_superuser %}
+                                            <form action="{% url 'eliminar_catalogo' item.id %}" method="POST" class="d-inline m-0" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta versión del catálogo? Esta acción no se puede deshacer.');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-action btn-delete" title="Borrar Catálogo">
+                                                    <i class="fas fa-trash-alt me-1"></i> Borrar
+                                                </button>
+                                            </form>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -196,20 +205,20 @@
                                     <th>Versión</th>
                                     <th>Fecha de Generación</th>
                                     <th>Estado</th>
-                                    <th class="text-end">Acciones</th>
+                                    <th class="text-end" style="min-width: 320px;">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in catalogos_sin_precio %}
                                 <tr>
                                     <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-light text-secondary rounded-circle me-3 p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <div class="d-flex align-items-center my-auto">
+                                            <div class="bg-light text-secondary rounded-circle me-3 p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 40px;">
                                                 <i class="fas fa-file-pdf fa-lg"></i>
                                             </div>
-                                            <div>
-                                                <span class="fw-bold d-block text-dark">Versión #{{ item.version_number }}</span>
-                                                <small class="text-muted">PDF Sin Precio</small>
+                                            <div class="d-flex flex-column justify-content-center">
+                                                <span class="fw-bold d-block text-dark lh-sm">Versión #{{ item.version_number }}</span>
+                                                <small class="text-muted lh-sm mt-1">PDF Sin Precio</small>
                                             </div>
                                         </div>
                                     </td>
@@ -228,21 +237,31 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
-                                        <div class="btn-group gap-1">
+                                        <div class="d-inline-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                             {% if request.user.is_superuser and not item.is_current %}
-                                            <form action="{% url 'marcar_catalogo_vigente' item.id %}" method="POST" class="d-inline">
+                                            <form action="{% url 'marcar_catalogo_vigente' item.id %}" method="POST" class="d-inline m-0">
                                                 {% csrf_token %}
-                                                <button type="submit" class="btn btn-outline-success btn-sm" title="Marcar como Vigente">
-                                                    <i class="fas fa-star me-1"></i> Marcar Vigente
+                                                <button type="submit" class="btn btn-action btn-vigente" title="Marcar como Vigente">
+                                                    <i class="fas fa-star me-1"></i> Vigente
                                                 </button>
                                             </form>
                                             {% endif %}
+
                                             {% if item.pdf_file %}
-                                            <a href="{{ item.pdf_file.url }}" class="btn btn-primary btn-sm" target="_blank" download title="Descargar PDF">
+                                            <a href="{{ item.pdf_file.url }}" class="btn btn-action btn-download" target="_blank" download title="Descargar PDF">
                                                 <i class="fas fa-download me-1"></i> Descargar
                                             </a>
                                             {% else %}
                                             <button class="btn btn-secondary btn-sm" disabled>No disponible</button>
+                                            {% endif %}
+
+                                            {% if request.user.is_superuser %}
+                                            <form action="{% url 'eliminar_catalogo' item.id %}" method="POST" class="d-inline m-0" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta versión del catálogo? Esta acción no se puede deshacer.');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-action btn-delete" title="Borrar Catálogo">
+                                                    <i class="fas fa-trash-alt me-1"></i> Borrar
+                                                </button>
+                                            </form>
                                             {% endif %}
                                         </div>
                                     </td>

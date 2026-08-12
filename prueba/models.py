@@ -1,9 +1,13 @@
 from django.db import models
+import os
 
 class Producto(models.Model):
     field_id = models.AutoField(db_column="_id", primary_key=True)
     codigo = models.TextField(blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True)
+    empaque_inner = models.CharField(max_length=100, null=True, blank=True)
+    empaque_master = models.CharField(max_length=100, null=True, blank=True)
+    empaque_pallet = models.CharField(max_length=100, null=True, blank=True)
 
     proveedor = models.ForeignKey(
         "Proveedor",
@@ -70,6 +74,10 @@ class VistaProductoAgrupado(models.Model):
     eliminado = models.FloatField(blank=True, null=True)
     familia_nombre = models.CharField(max_length=255, null=True, blank=True)
     unidad_medida = models.TextField(blank=True, null=True)
+    empaque_inner = models.CharField(max_length=100, null=True, blank=True)
+    empaque_master = models.CharField(max_length=100, null=True, blank=True)
+    cantidad_variantes = models.IntegerField(null=True, blank=True)
+    empaque_pallet = models.CharField(max_length=100, null=True, blank=True)
 
     proveedor = models.ForeignKey(
         "Proveedor",
@@ -97,10 +105,52 @@ class VistaProductoAgrupado(models.Model):
 
 
 # =====================================================================
+# NUEVA VISTA SQL PARA EXTRAER TODAS LAS VARIANTES SIN COMPRIMIR
+# =====================================================================
+class VistaProductoVariantes(models.Model):
+    id = models.IntegerField(primary_key=True) 
+    codigo = models.TextField(blank=True, null=True)
+    codigo_de_origen = models.CharField(max_length=255, null=True, blank=True)
+    descripcion = models.TextField(blank=True, null=True)
+    descripcion_grupo = models.TextField(blank=True, null=True)
+    precio_base_pesos = models.FloatField(blank=True, null=True)
+    stock_disponible = models.FloatField(blank=True, null=True)
+    eliminado = models.FloatField(blank=True, null=True)
+    
+    proveedor = models.ForeignKey(
+        "Proveedor",
+        db_column="proveedor_id",
+        on_delete=models.DO_NOTHING,
+        blank=True,
+        null=True,
+        related_name="variantes_productos",
+    )
+    
+    unidad_medida = models.TextField(blank=True, null=True)
+    familia_nombre = models.CharField(max_length=255, null=True, blank=True)
+    empaque_inner = models.CharField(max_length=100, null=True, blank=True)
+    empaque_master = models.CharField(max_length=100, null=True, blank=True)
+    empaque_pallet = models.CharField(max_length=100, null=True, blank=True)
+    indice_catalogo = models.IntegerField(blank=True, null=True)
+
+    @property
+    def familia(self):
+        if not self.codigo or "-" not in self.codigo:
+            return None
+        partes = self.codigo.split("-")
+        if len(partes) < 2:
+            return None
+        return FamiliaProducto.objects.filter(codigo=partes[1]).first()
+
+    class Meta:
+        managed = False
+        db_table = "vista_producto_variantes"
+
+
+# =====================================================================
 # MODELOS ADMINISTRADOS POR DJANGO
 # =====================================================================
 class ImagenProducto(models.Model):
-    # db_index=True es vital aquí y ya lo tienes configurado correctamente.
     grupo_nombre = models.CharField(max_length=255, unique=True, db_index=True)
     imagen = models.ImageField(upload_to='productos/')
     descripcion = models.TextField(blank=True, null=True)
@@ -124,9 +174,6 @@ class CatalogCache(models.Model):
     def __str__(self):
         return f"Catálogo v{self.version_number} - {'Actual' if self.is_current else 'Anterior'}"
     
-from django.db import models
-import os
-
 class HistorialCatalogo(models.Model):
     nombre = models.CharField(max_length=200, verbose_name="Nombre del Catálogo")
     archivo_pdf = models.FileField(upload_to='catalogos_pdf/', verbose_name="Archivo PDF")
@@ -135,13 +182,11 @@ class HistorialCatalogo(models.Model):
     class Meta:
         verbose_name = "Historial de Catálogo"
         verbose_name_plural = "Historial de Catálogos"
-        # Ordenamos por defecto del más antiguo al más nuevo
         ordering = ['fecha_creacion']
 
     def __str__(self):
         return f"{self.nombre} - {self.fecha_creacion.strftime('%d/%m/%Y %H:%M')}"
 
-    # Opcional pero recomendado: Borrar el archivo físico cuando se borra el registro de la BD
     def delete(self, *args, **kwargs):
         if self.archivo_pdf and os.path.isfile(self.archivo_pdf.path):
             os.remove(self.archivo_pdf.path)

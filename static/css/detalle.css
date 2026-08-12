@@ -1,99 +1,220 @@
- :root {
-        --color-primario: #1a3c6e;
-        --color-primario-claro: #2b5694;
-        --color-fondo: #f4f6f9;
-        --color-borde: #e1e5eb;
-        --color-texto: #222;
-        --color-texto-suave: #6b7280;
-        --radio: 10px;
-    }
+:root {
+    /* Paleta Neutra Base */
+    --color-primario: #111827;      /* Negro carbón para títulos */
+    --color-secundario: #4b5563;    /* Gris oscuro para textos secundarios */
+    --color-fondo-body: #f3f4f6;    /* Gris muy claro para el fondo */
+    --color-fondo-card: #ffffff;    /* Blanco puro para las tarjetas */
+    --color-borde: #e5e7eb;         /* Bordes sutiles */
+    
+    /* Tonos Verde Ecosa (Acentos) */
+    --color-verde-principal: #059669; /* Verde esmeralda moderno y legible */
+    --color-verde-oscuro: #047857;    /* Verde más intenso para efectos hover */
+    --color-verde-claro: #d1fae5;     /* Verde pastel para fondos de etiquetas */
+    --color-verde-hover: #f0fdf4;     /* Verde ultra tenue para el fondo de las filas de la tabla */
+    
+    --radio: 12px;
+    --sombra-suave: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --sombra-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
 
-    body {
-        margin: 0;
-        font-family: "Segoe UI", Roboto, sans-serif;
-        background: var(--color-fondo);
-        color: var(--color-texto);
-        padding: 40px 20px;
-    }
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--color-fondo-body);
+    color: var(--color-secundario);
+    padding: 40px 20px;
+    line-height: 1.6;
+}
 
-    .container {
-        max-width: 800px;
-        margin: 0 auto;
-        background: #fff;
-        border: 1px solid var(--color-borde);
-        border-radius: var(--radio);
-        padding: 30px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--color-fondo-card);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    padding: 40px;
+    box-shadow: var(--sombra-suave);
+}
 
-    .volver {
-        display: inline-block;
-        margin-bottom: 20px;
-        color: var(--color-primario-claro);
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.9rem;
-    }
-    .volver:hover { text-decoration: underline; }
+/* Botón Volver con ícono */
+.volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    color: var(--color-secundario);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
+}
 
-    .header-detalle {
-        border-bottom: 1px solid var(--color-borde);
-        padding-bottom: 20px;
-        margin-bottom: 25px;
-    }
+.volver:hover { 
+    color: var(--color-verde-principal);
+}
 
-    .header-detalle .marca {
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        font-weight: 700;
-        letter-spacing: 1px;
-        color: var(--color-primario-claro);
-    }
+/* Cabecera */
+.header-detalle {
+    border-bottom: 1px solid var(--color-borde);
+    padding-bottom: 24px;
+    margin-bottom: 30px;
+}
 
-    .header-detalle h1 {
-        margin: 5px 0 0 0;
-        font-size: 1.8rem;
-        color: var(--color-primario);
-    }
+.header-detalle .marca {
+    display: inline-block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    /* Toque de verde en la etiqueta */
+    color: var(--color-verde-oscuro);
+    background: var(--color-verde-claro);
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
 
-    .table-wrapper {
-        border: 1px solid var(--color-borde);
-        border-radius: 8px;
-        overflow: hidden;
-    }
+.header-detalle h1 {
+    margin: 0;
+    font-size: 2rem;
+    color: var(--color-primario);
+    font-weight: 800;
+    line-height: 1.2;
+}
 
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: left;
-        font-size: 0.95rem;
-    }
+.familia {
+    color: var(--color-secundario);
+    margin: 8px 0 0 0;
+    font-size: 0.95rem;
+}
 
-    th {
-        background: var(--color-fondo);
-        color: var(--color-primario);
-        padding: 14px;
-        font-weight: 600;
-        border-bottom: 1px solid var(--color-borde);
-    }
+/* Layout del Producto */
+.product-layout {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 40px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
 
-    td {
-        padding: 14px;
-        border-bottom: 1px solid var(--color-borde);
-    }
+.product-image-wrapper {
+    flex: 0 0 280px;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    background: var(--color-fondo-card);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--sombra-suave);
+    transition: all 0.3s ease;
+}
 
-    tr:last-child td { border-bottom: none; }
-    tr:hover { background: #f9fafb; }
+.product-image-wrapper:hover {
+    box-shadow: var(--sombra-hover);
+    border-color: var(--color-verde-claro); /* Borde sutil al hacer hover */
+}
 
-    .text-mono {
-        font-family: monospace;
-        background: var(--color-fondo);
-        padding: 3px 6px;
-        border-radius: 4px;
-        font-size: 0.85rem;
-    }
+.product-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+    object-fit: contain;
+}
 
-    .precio {
-        font-weight: 600;
-        color: var(--color-primario);
-    }
+.product-desc {
+    flex: 1;
+    min-width: 300px;
+    background: #fafafa;
+    padding: 24px;
+    border-radius: var(--radio);
+    border: 1px solid var(--color-borde);
+}
+
+.product-desc h4 {
+    margin-top: 0;
+    color: var(--color-primario);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.product-desc p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--color-secundario);
+}
+
+/* Título de la tabla */
+h3 {
+    color: var(--color-primario);
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+    font-weight: 700;
+}
+
+/* Tabla modernizada */
+.table-wrapper {
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    overflow: hidden;
+    box-shadow: var(--sombra-suave);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.95rem;
+    background: var(--color-fondo-card);
+}
+
+th {
+    background: #fafafa;
+    color: var(--color-secundario);
+    padding: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--color-borde);
+}
+
+td {
+    padding: 16px;
+    border-bottom: 1px solid var(--color-borde);
+    vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: none; }
+
+/* Fila con hover verde ultra suave */
+tr:hover { 
+    background: var(--color-verde-hover); 
+}
+
+/* Elementos de texto de la tabla */
+.text-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    background: var(--color-fondo-body);
+    color: var(--color-primario);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-borde);
+}
+
+/* Precio destacado en verde */
+.precio {
+    font-weight: 700;
+    color: var(--color-verde-principal);
+    font-size: 1.05rem;
+}
+
+.consultar {
+    font-size: 0.9rem;
+    color: var(--color-secundario);
+    font-weight: 400;
+    font-style: italic;
+}

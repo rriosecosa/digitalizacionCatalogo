@@ -4,8 +4,8 @@ import os
 import base64
 import mimetypes
 import tempfile
+import re
 
-from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import permission_required, login_required, user_passes_test
 from django.core.paginator import Paginator
@@ -17,27 +17,15 @@ from django.db.models import Case, When, Value, IntegerField, Q
 from django.core.exceptions import PermissionDenied
 from django.conf import settings
 from django.templatetags.static import static
-from django.utils.text import slugify
 import difflib
 from playwright.sync_api import sync_playwright
-import fitz  # PyMuPDF para la fusión en memoria de los dos pases
-
-from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache
-import os
-import re
-import tempfile
 import fitz  # PyMuPDF
-from datetime import datetime
-from collections import OrderedDict
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-
-
-
+from django.views.decorators.cache import never_cache
 from django.utils.text import slugify
 
-
+# AQUÍ IMPORTAMOS EL NUEVO MODELO VistaProductoVariantes
+from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes
 
 # ==========================================
 # FUNCIONES AUXILIARES
@@ -72,35 +60,18 @@ def obtener_base64_imagen(ruta_imagen):
                 
     return ruta_imagen
 
-import re
 
 def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_origen: str = "") -> str:
-    """
-    Compara el nombre del grupo con la descripción completa de una variante
-    y devuelve solo la parte que difiere (la medida/talla).
-
-    Primero limpia de la descripción el código de proveedor exacto
-    (campo 'codigo_de_origen' del modelo), si viene informado y coincide
-    con el inicio del texto. Como respaldo, también intenta quitar
-    cualquier código numérico suelto al inicio (por si el campo viniera vacío).
-
-    Ej: nombre_grupo = 'GRATA DE COPA TRENZADA FINA'
-        descripcion_variante = '28260 GRATA DE COPA TRENZADA FINA 5"'
-        codigo_de_origen = '28260'
-        -> devuelve: '5"'
-    """
     if not nombre_grupo or not descripcion_variante:
         return descripcion_variante or ""
 
     descripcion_limpia = descripcion_variante.strip()
 
-    # 1. Quitar el código de proveedor exacto, si lo tenemos y calza al inicio
     if codigo_de_origen:
         codigo_de_origen = codigo_de_origen.strip()
         if codigo_de_origen and descripcion_limpia.startswith(codigo_de_origen):
             descripcion_limpia = descripcion_limpia[len(codigo_de_origen):].strip()
 
-    # 2. Respaldo: si quedó algún código numérico suelto al inicio (ej. codigo_de_origen vacío)
     descripcion_limpia = re.sub(r'^\d{3,7}\s+', '', descripcion_limpia)
 
     palabras_grupo = nombre_grupo.split()
@@ -130,7 +101,6 @@ def obtener_file_uri(imagen_field):
 
     return None
 
-
 def obtener_logo_marca(marca: str) -> str | None:
     if not marca:
         return None
@@ -148,7 +118,6 @@ def obtener_logo_marca(marca: str) -> str | None:
 
     return None
 
-
 def es_admin(user):
     if user.is_superuser:
         return True
@@ -158,15 +127,23 @@ def es_admin(user):
 # ==========================================
 # VISTA: LISTA DE PRODUCTOS (CATÁLOGO PÚBLICO)
 # ==========================================
+@never_cache
 def lista_productos(request):
-    familia_seleccionada = request.GET.get("familia", "")
-    marca_seleccionada = request.GET.get("marca", "")
+    familia_seleccionada = request.GET.get("familia", "").strip()
+    marca_seleccionada = request.GET.get("marca", "").strip()
     texto_busqueda = request.GET.get("q", "").strip()
 
     familias = {f.codigo: f for f in FamiliaProducto.objects.all()}
 
     productos = (
         VistaProductoAgrupado.objects
+        .annotate(
+            es_truper=Case(
+                When(codigo__startswith='17', then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField()
+            )
+        )
         .select_related("proveedor")
         .exclude(
             Q(descripcion__isnull=True) | 
@@ -198,7 +175,8 @@ def lista_productos(request):
             Q(proveedor__marca__icontains=texto_busqueda)
         )
 
-    productos = productos.order_by("descripcion")
+    productos = productos.order_by("es_truper", "codigo")
+
     grupos = OrderedDict()
 
     for p in productos:
@@ -235,13 +213,20 @@ def lista_productos(request):
 
     lista_grupos = list(grupos.values())
     
-    nombres_grupos = [g["nombre"] for g in lista_grupos]
-    imagenes_dict = {img.grupo_nombre: img.imagen.url for img in ImagenProducto.objects.filter(grupo_nombre__in=nombres_grupos) if img.imagen}
+    imagenes_dict = {
+        str(img.grupo_nombre).strip().upper(): img.imagen.url 
+        for img in ImagenProducto.objects.all() if img.imagen
+    }
 
     for g in lista_grupos:
-        g["imagen_url"] = imagenes_dict.get(g["nombre"], None)
-        g["cantidad"] = len(g["productos"])
-
+        nombre_limpio = str(g["nombre"]).strip().upper()
+        g["imagen_url"] = imagenes_dict.get(nombre_limpio, None)
+        
+        # Leemos el conteo real de variantes desde la vista SQL
+        prod_base = g["productos"][0]
+        cant_var = getattr(prod_base, 'cantidad_variantes', None)
+        g["cantidad"] = cant_var if (cant_var is not None and cant_var > 0) else len(g["productos"])
+   
     conteo_familias = {}
     conteo_marcas = {}
     for g in lista_grupos:
@@ -280,9 +265,7 @@ def lista_productos(request):
     )
 
 
-# ==========================================
-# VISTA: DETALLE INDEPENDIENTE
-# ==========================================
+@never_cache
 def detalle_producto(request, producto_id):
     producto_base = get_object_or_404(VistaProductoAgrupado.objects.select_related("proveedor"), id=producto_id)
 
@@ -301,7 +284,8 @@ def detalle_producto(request, producto_id):
             except ValueError:
                 imagen_url = info_grupo.imagen
 
-    variantes = VistaProductoAgrupado.objects.select_related("proveedor").exclude(
+    # Traemos las variantes sin excluir si marca_grupo es vacía o tiene diferencias de caja
+    variantes_qs = VistaProductoVariantes.objects.select_related("proveedor").exclude(
         Q(descripcion__isnull=True) | 
         Q(descripcion__exact='') | 
         Q(descripcion__startswith='*') | 
@@ -313,12 +297,18 @@ def detalle_producto(request, producto_id):
         Q(proveedor__marca__iexact='a') |
         Q(proveedor__marca__iexact='KAISER - HEISSNER') |
         Q(proveedor__marca__iexact='HELA')
-    ).filter(
+    )
+
+    filtros_grupo = (
         Q(descripcion_grupo=nombre_grupo) | 
         Q(descripcion=nombre_grupo, descripcion_grupo__isnull=True) | 
-        Q(descripcion=nombre_grupo, descripcion_grupo=""),
-        proveedor__marca=marca_grupo
+        Q(descripcion=nombre_grupo, descripcion_grupo="")
     )
+
+    if marca_grupo:
+        variantes = variantes_qs.filter(filtros_grupo, proveedor__marca__iexact=marca_grupo).order_by('codigo')
+    else:
+        variantes = variantes_qs.filter(filtros_grupo).order_by('codigo')
 
     return render(
         request,
@@ -332,11 +322,10 @@ def detalle_producto(request, producto_id):
             "descripcion_grupo": descripcion_grupo
         },
     )
-
-
 # ==========================================
 # VISTA: PANEL DASHBOARD PRINCIPAL
 # ==========================================
+@never_cache
 @login_required(login_url='/login/')
 def dashboard_productos(request):
     texto_busqueda = request.GET.get("q", "").strip()
@@ -354,8 +343,6 @@ def dashboard_productos(request):
         Q(proveedor__marca__iexact='KAISER - HEISSNER') |
         Q(proveedor__marca__iexact='HELA') |
         Q(codigo='17-27-105')
-
-        
     )
 
     kpi_productos_activos = productos_base_qs.count()
@@ -418,14 +405,14 @@ def dashboard_productos(request):
 # ==========================================
 # OTRAS VISTAS DEL SISTEMA
 # ==========================================
-
+@never_cache
 @permission_required('prueba.change_producto', login_url='login')
 def editar_producto(request, producto_id):
     if request.method == "POST":
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
-        grupo_nombre = request.POST.get("grupo_nombre")
+        grupo_nombre = request.POST.get("grupo_nombre", "").strip().upper() # Forzamos mayúsculas para estandarizar
         descripcion_grupo = request.POST.get("descripcion_grupo")
 
         try:
@@ -438,6 +425,7 @@ def editar_producto(request, producto_id):
             )
 
             if grupo_nombre:
+                # Normalizamos el nombre del grupo para que siempre coincida
                 img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
                 if ruta_imagen:
                     img_obj.imagen = ruta_imagen
@@ -448,15 +436,17 @@ def editar_producto(request, producto_id):
             messages.success(request, "Producto actualizado correctamente.")
         except ValueError:
             messages.error(request, "Error: Los valores ingresados no son numéricos válidos.")
+        except Exception as e:
+            messages.error(request, f"Error al guardar: {e}")
 
     return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
 
-
+@never_cache
 def logout_view(request):
     logout(request)
     return redirect('login')
 
-
+@never_cache
 @login_required(login_url='/login/')
 @user_passes_test(es_admin)
 def menu_exportar(request):
@@ -501,7 +491,7 @@ def menu_exportar(request):
         'cantidad_catalogos': cantidad_catalogos
     })
 
-
+@never_cache
 @login_required(login_url='/login/')
 def historial_catalogo(request):
     catalogos_con_precio = CatalogCache.objects.exclude(
@@ -517,7 +507,7 @@ def historial_catalogo(request):
         'catalogos_sin_precio': catalogos_sin_precio,
     })
 
-
+@never_cache
 @login_required(login_url='/login/')
 def descargar_catalogo(request):
     catalogo_actual = CatalogCache.objects.filter(is_current=True).order_by('-version_number').first()
@@ -534,7 +524,7 @@ def descargar_catalogo(request):
         content_type='application/pdf',
     )
 
-
+@never_cache
 @login_required(login_url='/login/')
 def descargar_catalogo_version(request, catalogo_id):
     catalogo = get_object_or_404(CatalogCache, pk=catalogo_id)
@@ -550,62 +540,61 @@ def descargar_catalogo_version(request, catalogo_id):
         filename=nombre_archivo,
         content_type='application/pdf',
     )
-
-
+@never_cache
 @login_required(login_url='/login/')
 def eliminar_catalogo(request, catalogo_id):
     if not request.user.is_superuser:
         raise PermissionDenied
 
-    catalogo = get_object_or_404(CatalogCache, pk=catalogo_id)
-    if catalogo.pdf_file:
-        catalogo.pdf_file.delete(save=False)
+    # Usamos filter en lugar de get_object_or_404 para evitar MultipleObjectsReturned
+    catalogos = CatalogCache.objects.filter(pk=catalogo_id)
 
-    catalogo.delete()
-    messages.success(request, f"La versión {catalogo.version_number} del catálogo y su archivo PDF fueron eliminados para liberar espacio.")
+    if not catalogos.exists():
+        catalogos = CatalogCache.objects.filter(id=catalogo_id)
+
+    if not catalogos.exists():
+        messages.error(request, "El catálogo solicitado no existe o ya fue eliminado.")
+        return redirect('historial_catalogo')
+
+    version_num = None
+    for catalogo in catalogos:
+        version_num = catalogo.version_number
+        if catalogo.pdf_file:
+            # Borra el archivo físico del servidor sin guardar el modelo antes de eliminarlo
+            catalogo.pdf_file.delete(save=False)
+        catalogo.delete()
+
+    messages.success(
+        request, 
+        f"La versión {version_num or catalogo_id} del catálogo y su archivo PDF fueron eliminados para liberar espacio."
+    )
     return redirect('historial_catalogo')
-
-
 # ==========================================
 # GESTIÓN DE VIGENCIA Y BLOQUEO DE CATÁLOGOS
 # ==========================================
-
+@never_cache
 @login_required(login_url='/login/')
 @user_passes_test(lambda u: u.is_superuser)
 def marcar_catalogo_vigente(request, catalogo_id):
     catalogo = get_object_or_404(CatalogCache, id=catalogo_id)
     
-    # Identificar si el catálogo a marcar es "Sin Precio" o "Con Precio"
     is_sin_precio = 'Sin_Precio' in catalogo.pdf_file.name
     
-    # Desmarcar los otros catálogos de la misma modalidad
     if is_sin_precio:
         CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio').update(is_current=False)
     else:
         CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').update(is_current=False)
     
-    # Marcar el catálogo seleccionado como el vigente
     catalogo.is_current = True
     catalogo.save()
 
     messages.success(request, f"Se ha fijado el catálogo Versión {catalogo.version_number} como la versión vigente oficial.")
     return redirect('historial_catalogo')
-import os
-import re
-import tempfile
-import fitz  # PyMuPDF
-from datetime import datetime
-from collections import OrderedDict
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib import messages
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django.core.files.base import ContentFile
-from django.db.models import Case, When, Value, IntegerField
-from django.utils.text import slugify
-from playwright.sync_api import sync_playwright
 
+# ==========================================
+# GENERACIÓN DE PDF
+# ==========================================
+@never_cache
 @login_required(login_url='/login/')
 @user_passes_test(lambda u: u.is_superuser)
 def generar_pdf(request):
@@ -614,7 +603,6 @@ def generar_pdf(request):
         tipo_catalogo = request.POST.get('tipo_catalogo', 'con_precio')
         sin_precio = (tipo_catalogo == 'sin_precio')
 
-        # 1. FECHA DINÁMICA DE HOY EN ESPAÑOL
         MESES_ES = [
             "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -628,7 +616,7 @@ def generar_pdf(request):
             messages.error(request, "Debes seleccionar al menos un grupo para generar el catálogo.")
             return redirect('menu_exportar')
 
-        qs = VistaProductoAgrupado.objects.select_related("proveedor").filter(
+        qs = VistaProductoVariantes.objects.select_related("proveedor").filter(
             descripcion_grupo__in=grupos_seleccionados
         ).annotate(
             es_truper=Case(
@@ -651,14 +639,15 @@ def generar_pdf(request):
         productos.sort(key=lambda p: (
             p.es_truper,
             p.familia_temporal,
-            p.descripcion_grupo or p.descripcion or ""
+            p.descripcion_grupo or p.descripcion or "",
+            p.codigo
         ))
-        
+
         imagenes_dict = {
-            img.grupo_nombre: obtener_base64_imagen(img.imagen.name)
+            str(img.grupo_nombre).strip().upper(): obtener_base64_imagen(img.imagen.name)
             for img in ImagenProducto.objects.all() if img.imagen
         }
-        
+
         descripciones_dict = {img.grupo_nombre: img.descripcion for img in ImagenProducto.objects.all() if img.descripcion}
 
         UMBRAL_VARIANTES_TARJETA_ANCHA = 8
@@ -683,6 +672,10 @@ def generar_pdf(request):
                 }
 
             p.medida_mostrar = extraer_medida(grupo, p.descripcion or "", p.codigo_de_origen or "")
+
+            if p.es_truper != 0:
+                p.empaque_inner = None
+
             familias_de_marca[familia][grupo]['variantes'].append(p)
 
         catalogo = OrderedDict((k, v) for k, v in catalogo.items() if v)
@@ -691,6 +684,9 @@ def generar_pdf(request):
             for familia, grupos in list(familias_de_marca.items()):
                 for info in grupos.values():
                     info['es_ancha'] = len(info['variantes']) > UMBRAL_VARIANTES_TARJETA_ANCHA
+                    info['tiene_empaque_inner'] = any(
+                        v.empaque_inner for v in info['variantes']
+                    )
 
                 familias_de_marca[familia] = OrderedDict(
                     sorted(grupos.items(), key=lambda item: (item[1]['es_ancha'], item[0]))
@@ -727,7 +723,6 @@ def generar_pdf(request):
         </div>
         """
 
-        # DEJAMOS EL CENTRO LIBRE EN EL FOOTER DE PLAYWRIGHT PARA STAMPARLO CON PYMUPDF
         footer_template = f"""
         <style>
             #header, #footer {{ padding: 0 !important; margin: 0 !important; width: 100%; }}
@@ -772,7 +767,6 @@ def generar_pdf(request):
                     ]
                 )
                 try:
-                    # PASO 1: GENERAR PDF DE PRODUCTOS Y ESCANEAR PÁGINAS REALES
                     page_productos = browser.new_page()
                     page_productos.goto(f"file://{tmp_html_productos_path}", wait_until="load", timeout=180000)
 
@@ -789,7 +783,7 @@ def generar_pdf(request):
 
                     doc_productos = fitz.open(stream=pdf_bytes_productos, filetype="pdf")
                     page_map = {}
-                    
+
                     for i in range(doc_productos.page_count):
                         page = doc_productos[i]
                         text = page.get_text("text")
@@ -798,7 +792,6 @@ def generar_pdf(request):
                             if m not in page_map:
                                 page_map[m] = i + 1
 
-                    # PASO 2: GENERAR PORTADA/ÍNDICE DUMMY PARA CALCULAR OFFSET
                     html_inicio_dummy = render_to_string('catalogo_pdf.html', {
                         'catalogo': catalogo,
                         'request': request,
@@ -807,7 +800,7 @@ def generar_pdf(request):
                         'sin_precio': sin_precio,
                         'seccion': 'inicio',
                     })
-                    
+
                     page_inicio_dummy = browser.new_page()
                     page_inicio_dummy.set_content(html_inicio_dummy, wait_until="load", timeout=120000)
                     pdf_dummy = page_inicio_dummy.pdf(
@@ -819,15 +812,14 @@ def generar_pdf(request):
                     offset_paginas = doc_dummy.page_count
                     doc_dummy.close()
 
-                    # PASO 3: PREPARAR DATOS DEL ÍNDICE CON PÁGINAS ABSOLUTAS
                     indice_datos = []
                     for marca, familias in catalogo.items():
                         marcas_data = {'marca': marca, 'familias': []}
                         for familia in familias.keys():
                             id_sec = f"sec-{slugify(marca)}-{slugify(familia)}"
-                            pag_relativa = page_map.get(id_sec, 1) 
+                            pag_relativa = page_map.get(id_sec, 1)
                             pag_absoluta = offset_paginas + pag_relativa
-                            
+
                             marcas_data['familias'].append({
                                 'nombre': familia,
                                 'id_sec': id_sec,
@@ -836,7 +828,6 @@ def generar_pdf(request):
                         if marcas_data['familias']:
                             indice_datos.append(marcas_data)
 
-                    # PASO 4: RE-RENDERIZAR PORTADA/ÍNDICE CON PÁGINAS REALES
                     html_inicio_final = render_to_string('catalogo_pdf.html', {
                         'catalogo': catalogo,
                         'indice_datos': indice_datos,
@@ -858,7 +849,6 @@ def generar_pdf(request):
                     )
                     page_inicio_final.close()
 
-                    # PASO 5: FUSIÓN FINAL E INYECCIÓN DE HIPERVÍNCULOS
                     doc_inicio = fitz.open(stream=pdf_bytes_inicio, filetype="pdf")
                     doc_final = fitz.open()
                     doc_final.insert_pdf(doc_inicio)
@@ -866,10 +856,9 @@ def generar_pdf(request):
                     doc_inicio.close()
                     doc_productos.close()
 
-                    # Inyección de enlaces interactivos
                     for m in indice_datos:
                         for f in m['familias']:
-                            target_page = int(f['pagina']) - 1 
+                            target_page = int(f['pagina']) - 1
                             for i in range(offset_paginas):
                                 page = doc_final[i]
                                 areas = page.search_for(f['nombre'])
@@ -877,7 +866,6 @@ def generar_pdf(request):
                                     link = {"kind": fitz.LINK_GOTO, "from": rect, "page": target_page}
                                     page.insert_link(link)
 
-                    # Menú de Bookmarks Lateral
                     toc_pdf = []
                     for m in indice_datos:
                         toc_pdf.append([1, m['marca'], 1])
@@ -885,9 +873,6 @@ def generar_pdf(request):
                             toc_pdf.append([2, f['nombre'], int(f['pagina'])])
                     doc_final.set_toc(toc_pdf)
 
-                    # -------------------------------------------------------------
-                    # PASO 6: STAMPING DINÁMICO DEL PIE DE PÁGINA (CENTRO POR HOJA)
-                    # -------------------------------------------------------------
                     hitos_familias = []
                     for m in indice_datos:
                         for f in m['familias']:
@@ -895,7 +880,7 @@ def generar_pdf(request):
                                 'pagina': int(f['pagina']),
                                 'texto': f"{m['marca']} - {f['nombre']}"
                             })
-                   
+
                     hitos_familias.sort(key=lambda x: x['pagina'])
 
                     def obtener_cat_para_pagina(num_pag):
@@ -907,7 +892,6 @@ def generar_pdf(request):
                                 break
                         return cat_actual
 
-                    # Aplicar únicamente en las hojas de productos
                     for i in range(offset_paginas, doc_final.page_count):
                         num_hoja = i + 1
                         cat_texto = obtener_cat_para_pagina(num_hoja)
@@ -933,7 +917,7 @@ def generar_pdf(request):
                 os.remove(tmp_html_productos_path)
 
         fecha_archivo = datetime.now().strftime('%d-%m-%Y')
-        
+
         if sin_precio:
             nombre_archivo = f"Catalogo_Ecosa_Sin_Precio_{fecha_archivo}.pdf"
             catalogos_existentes = CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio').order_by('version_number')
@@ -943,12 +927,19 @@ def generar_pdf(request):
             catalogos_existentes = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').order_by('version_number')
             texto_tipo = "con precio"
 
+        # --- BORRADO DEL MÁS ANTIGUO (mantiene máximo 3 por tipo) ---
         if catalogos_existentes.count() >= 3:
             catalogo_mas_antiguo = catalogos_existentes.first()
             if catalogo_mas_antiguo.pdf_file:
+                ruta_fisica = catalogo_mas_antiguo.pdf_file.path
                 catalogo_mas_antiguo.pdf_file.delete(save=False)
+                if os.path.exists(ruta_fisica):
+                    logger.warning(f"[generar_pdf] El archivo {ruta_fisica} no se eliminó del disco (delete silencioso).")
             catalogo_mas_antiguo.delete()
             messages.warning(request, f"Se ha eliminado el catálogo {texto_tipo} más antiguo para liberar espacio.")
+
+        # --- RED DE SEGURIDAD: limpia huérfanos que no coincidan con la BD ---
+        limpiar_pdfs_huerfanos(sin_precio)
 
         ultima_version = CatalogCache.objects.order_by('-version_number').first()
         siguiente_version = (ultima_version.version_number + 1) if ultima_version else 1
@@ -963,3 +954,45 @@ def generar_pdf(request):
         return response
 
     return redirect('dashboard')
+
+import logging
+logger = logging.getLogger(__name__)
+
+def limpiar_pdfs_huerfanos(sin_precio):
+    """
+    Red de seguridad: recorre media/catalogos/ y elimina físicamente
+    cualquier PDF del tipo indicado que ya no tenga un registro
+    correspondiente en CatalogCache (huérfanos históricos o fallos de borrado).
+    """
+    carpeta = os.path.join(settings.MEDIA_ROOT, 'catalogos')
+    if not os.path.isdir(carpeta):
+        return
+
+    if sin_precio:
+        nombres_validos = {
+            os.path.basename(c.pdf_file.name)
+            for c in CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio')
+        }
+        es_del_tipo = lambda f: 'Sin_Precio' in f
+    else:
+        nombres_validos = {
+            os.path.basename(c.pdf_file.name)
+            for c in CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio')
+        }
+        es_del_tipo = lambda f: f.startswith('Catalogo_Ecosa_') and 'Sin_Precio' not in f
+
+    for nombre_archivo in os.listdir(carpeta):
+        if not nombre_archivo.lower().endswith('.pdf'):
+            continue
+        if not es_del_tipo(nombre_archivo):
+            continue
+        if nombre_archivo not in nombres_validos:
+            ruta_completa = os.path.join(carpeta, nombre_archivo)
+            try:
+                os.remove(ruta_completa)
+                logger.info(f"[limpieza catalogos] Huérfano eliminado: {nombre_archivo}")
+            except OSError as e:
+                logger.warning(f"[limpieza catalogos] No se pudo eliminar {nombre_archivo}: {e}")
+
+
+

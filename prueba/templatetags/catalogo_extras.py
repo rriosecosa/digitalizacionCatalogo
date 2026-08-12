@@ -7,3 +7,4 @@ def dictget(d, key):
     if not d:
         return None
     return d.get(key)
+
