@@ -1,70 +1,53 @@
 import os
-import sys
 import django
-from django.db import connection
 
-# 1. Configurar el entorno de Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pruebabd.settings')
+# 1. Configuración del entorno (Ajusta 'tu_proyecto' por el nombre de tu carpeta principal)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pruebabd.settings') 
 django.setup()
 
-from prueba.models import ImagenProducto
+# 2. IMPORTAMOS LA VISTA EN LUGAR DE LA TABLA BASE (Ajusta 'tu_app')
+from prueba.models import VistaProductoAgrupado, ImagenProducto 
 
-def vincular_imagenes_automatico():
-    print("--- INICIANDO VINCULACIÓN MASIVA DE IMÁGENES ---")
+def previncular_imagenes():
+    print("--- INICIANDO PRE-VINCULACIÓN MASIVA DE IMÁGENES ---")
+
+    # Cargamos en memoria los grupos que ya tienen foto para no sobreescribir
+    grupos_procesados = set(ImagenProducto.objects.values_list('grupo_nombre', flat=True))
     
-    carpeta_img = os.path.join('media', 'productos')
-    
-    if not os.path.exists(carpeta_img):
-        print(f"❌ Error: No se encontró la carpeta {carpeta_img}")
-        return
+    # 3. CONSULTAMOS LA VISTA SQL DONDE SÍ VIVEN LOS GRUPOS
+    productos = VistaProductoAgrupado.objects.all()
 
-    archivos = os.listdir(carpeta_img)
-    vinculados = 0
-    omitidos = 0
+    for p in productos:
+        # Ahora sí, descripcion_grupo existe nativamente aquí
+        grupo_nombre = p.descripcion_grupo or p.descripcion
+        codigo = p.codigo 
 
-    for archivo in archivos:
-        if archivo.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-            codigo_producto = os.path.splitext(archivo)[0].strip()
+        if not grupo_nombre or not codigo:
+            continue
 
-            try:
-                # 2. BUSCAR EN LA TABLA BASE MEDIANTE SQL
-                # Se utiliza r"""...""" para evitar advertencias de sintaxis con \d y \s
-                with connection.cursor() as cursor:
-                    cursor.execute(r"""
-                        SELECT TRIM(BOTH FROM regexp_replace(
-                            regexp_replace(
-                                regexp_replace(upper((descripcion)::text), '\d+\s/\s*\d+"|\d+"|\d+\s*[Xx]\s*\d+\s*[Xx]\s*\d+|\d+\s*[Xx]\s*\d+|\d+\s CM|\d+\s MT|\d+\s ML|\d+\s L\y|\d+\s GR|\d+\sG\y|G\d+|\y\d+\y'::text, ''::text, 'g'::text), '[- /()]'::text, ' '::text, 'g'::text
-                            ), 
-                            '\s+'::text, ' '::text, 'g'::text
-                        )) 
-                        FROM producto 
-                        WHERE codigo = %s
-                        LIMIT 1
-                    """, [codigo_producto])
-                    
-                    row = cursor.fetchone()
+        # Evitamos procesar grupos repetidos o que ya tienen imagen
+        if grupo_nombre in grupos_procesados:
+            continue
 
-                if row and row[0]:
-                    grupo_nombre = row[0]
-                    ruta_relativa = f'productos/{archivo}'
-                    
-                    ImagenProducto.objects.update_or_create(
-                        grupo_nombre=grupo_nombre,
-                        defaults={'imagen': ruta_relativa}
-                    )
-                    vinculados += 1
-                    print(f"✅ Éxito: Foto '{archivo}' vinculada al grupo -> {grupo_nombre}")
-                else:
-                    omitidos += 1
-                    print(f"⚠️ Omisión: No se encontró el código '{codigo_producto}' en la base de datos.")
+        # Ruta estándar a asignar
+        ruta_imagen = f"productos/{codigo}.png"
 
-            except Exception as e:
-                print(f"❌ Error procesando el código {codigo_producto}: {e}")
+        try:
+            img_obj, created = ImagenProducto.objects.update_or_create(
+                grupo_nombre=grupo_nombre,
+                defaults={'imagen': ruta_imagen}
+            )
+            
+            if created:
+                print(f"✅ Vinculado: {grupo_nombre} -> {ruta_imagen}")
+            
+            grupos_procesados.add(grupo_nombre)
 
-    print(f"\n--- PROCESO TERMINADO ---")
-    print(f"✅ Grupos actualizados: {vinculados}")
-    print(f"⚠️ Imágenes ignoradas por no existir código: {omitidos}")
+        except Exception as e:
+            print(f"⚠️ Error al procesar el grupo '{grupo_nombre}': {e}")
+            continue
+
+    print("--- PROCESO FINALIZADO ---")
 
 if __name__ == '__main__':
-    sys.stdout.reconfigure(encoding='utf-8')
-    vincular_imagenes_automatico()
+    previncular_imagenes()

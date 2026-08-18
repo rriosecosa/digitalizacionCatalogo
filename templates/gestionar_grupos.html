@@ -1,0 +1,193 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Productos y Grupos - Ecosa</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{% static 'css/gestionar.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+
+</head>
+<body>
+    <datalist id="lista-grupos-existentes">
+        {% for grp in todos_los_grupos %}
+            <option value="{{ grp }}">
+        {% endfor %}
+    </datalist>
+
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Gestión de Nombres y Agrupaciones</h1>
+                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">Guarda productos de forma individual o guarda los cambios de toda la página a la vez.</p>
+            </div>
+            <div class="header-actions">
+                <button type="submit" form="form-masivo" name="accion" value="guardar_pagina" class="btn-guardar-todo">
+                    <i class="bi bi-floppy-fill"></i> Guardar toda la página
+                </button>
+                <a href="{% url 'dashboard' %}" class="btn-regresar"><i class="bi bi-arrow-left"></i> Volver al Dashboard</a>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="msg msg-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="card">
+            <form class="search-bar" method="GET">
+                <input type="text" name="q" placeholder="Buscar por código, descripción o marca..." value="{{ busqueda }}">
+                <button type="submit"><i class="bi bi-search"></i> Buscar</button>
+            </form>
+
+            <!-- Formulario Masivo de la Página -->
+            <form id="form-masivo" method="POST">
+                {% csrf_token %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 95px;">Código</th>
+                            <th style="width: 320px;">Descripción (ERP/Web)</th>
+                            <th style="width: 100px;">Marca</th>
+                            <th style="width: 300px;">Grupo Asignado</th>
+                            <th style="width: 220px;">Nombre Limpio / Medida (PDF)</th>
+                            <th style="width: 140px; text-align: center;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in productos %}
+                        <tr id="fila-{{ p.id }}">
+                            <td>
+                                <strong>{{ p.codigo }}</strong>
+                                <input type="hidden" name="producto_id[]" value="{{ p.id }}">
+                            </td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nueva_descripcion[]" 
+                                    class="input-text campo-desc-{{ p.id }}" 
+                                    value="{{ p.descripcion|default:'' }}"
+                                    placeholder="Descripción general..."
+                                >
+                            </td>
+                            <td>{{ p.proveedor.marca|default:"--" }}</td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nuevo_grupo[]" 
+                                    class="input-text campo-grupo-{{ p.id }}" 
+                                    list="lista-grupos-existentes" 
+                                    value="{{ p.grupo_activo }}"
+                                    placeholder="Selecciona o escribe..."
+                                    autocomplete="off"
+                                >
+                                {% if p.grupo_manual %}
+                                    <span class="badge-manual">★ Grupo Manual</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nuevo_nombre_limpio[]" 
+                                    class="input-text input-limpio campo-limpio-{{ p.id }}" 
+                                    value="{{ p.nombre_limpio }}"
+                                    placeholder="Medida o variante..."
+                                >
+                                {% if p.nombre_limpio_es_manual %}
+                                    <span class="badge-limpio-manual">★ Editado a mano</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="acciones-fila">
+                                    <button 
+                                        type="button" 
+                                        class="btn-guardar-indiv" 
+                                        title="Guardar solo este producto"
+                                        onclick="guardarIndividual('{{ p.id }}');"
+                                    >
+                                        Guardar
+                                    </button>
+                                    {% if p.grupo_manual or p.nombre_limpio_es_manual %}
+                                        <button 
+                                            type="submit" 
+                                            form="form-restaurar-{{ p.id }}" 
+                                            class="btn-restaurar" 
+                                            title="Restaurar a valores automáticos"
+                                            onclick="return confirm('¿Restaurar producto {{ p.codigo }} a sus valores automáticos?');"
+                                        >
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 24px; color: #94a3b8;">No se encontraron productos.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="barra-inferior">
+                    <button type="submit" name="accion" value="guardar_pagina" class="btn-guardar-todo">
+                        <i class="bi bi-floppy-fill"></i> Guardar toda la página
+                    </button>
+                </div>
+            </form>
+
+            <!-- Formulario oculto auxiliar para procesar guardados individuales -->
+            <form id="form-guardar-individual" method="POST" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="guardar_individual">
+                <input type="hidden" name="producto_id_individual" id="indiv_id">
+                <input type="hidden" name="nueva_descripcion_individual" id="indiv_desc">
+                <input type="hidden" name="nuevo_grupo_individual" id="indiv_grupo">
+                <input type="hidden" name="nuevo_nombre_limpio_individual" id="indiv_limpio">
+            </form>
+
+            <!-- Formularios individuales para restaurar -->
+            {% for p in productos %}
+                {% if p.grupo_manual or p.nombre_limpio_es_manual %}
+                    <form id="form-restaurar-{{ p.id }}" method="POST" style="display: none;">
+                        {% csrf_token %}
+                        <input type="hidden" name="accion" value="restaurar_individual">
+                        <input type="hidden" name="producto_id_restaurar" value="{{ p.id }}">
+                    </form>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="paginacion">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹ Anterior</a>
+                {% endif %}
+                <span class="actual">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">Siguiente ›</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function guardarIndividual(productoId) {
+            const desc = document.querySelector('.campo-desc-' + productoId).value;
+            const grupo = document.querySelector('.campo-grupo-' + productoId).value;
+            const limpio = document.querySelector('.campo-limpio-' + productoId).value;
+
+            document.getElementById('indiv_id').value = productoId;
+            document.getElementById('indiv_desc').value = desc;
+            document.getElementById('indiv_grupo').value = grupo;
+            document.getElementById('indiv_limpio').value = limpio;
+
+            document.getElementById('form-guardar-individual').submit();
+        }
+    </script>
+</body>
+</html>

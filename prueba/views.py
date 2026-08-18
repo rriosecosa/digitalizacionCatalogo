@@ -24,8 +24,8 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.utils.text import slugify
 
-# AQUÍ IMPORTAMOS EL NUEVO MODELO VistaProductoVariantes
-from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes
+# AQUÍ IMPORTAMOS EL NUEVO MODELO VistaProductoVariantes Y ProductoGrupoManual
+from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes, ProductoGrupoManual
 
 # ==========================================
 # FUNCIONES AUXILIARES
@@ -60,33 +60,117 @@ def obtener_base64_imagen(ruta_imagen):
                 
     return ruta_imagen
 
+import re
+import difflib
 
 def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_origen: str = "") -> str:
     if not nombre_grupo or not descripcion_variante:
-        return descripcion_variante or ""
+        return "--"
 
-    descripcion_limpia = descripcion_variante.strip()
+    nombre_grupo_str = str(nombre_grupo).strip().upper()
+    descripcion_limpia = str(descripcion_variante).strip().upper()
+
+    # 1. DESTRUCTOR DE PUNTOS SUSPENSIVOS
+    descripcion_limpia = descripcion_limpia.replace('…', ' ').replace('...', ' ')
+    nombre_grupo_str = nombre_grupo_str.replace('…', ' ').replace('...', ' ')
+
+    # 🔥 2. SEPARADOR INTELIGENTE: Despega números y comillas de las letras
+    # Convierte 'ESTAND.18"' -> 'ESTAND. 18"' para que Python pueda leer el número solo
+    descripcion_limpia = re.sub(r'([A-Z\.])(\d)', r'\1 \2', descripcion_limpia)
+    # Convierte '18"MANGO' -> '18" MANGO'
+    descripcion_limpia = re.sub(r'(\d|")([A-Z])', r'\1 \2', descripcion_limpia)
 
     if codigo_de_origen:
-        codigo_de_origen = codigo_de_origen.strip()
+        codigo_de_origen = str(codigo_de_origen).strip().upper()
         if codigo_de_origen and descripcion_limpia.startswith(codigo_de_origen):
             descripcion_limpia = descripcion_limpia[len(codigo_de_origen):].strip()
 
+    # Quitar códigos numéricos internos iniciales (ej: 15885, 12350)
     descripcion_limpia = re.sub(r'^\d{3,7}\s+', '', descripcion_limpia)
 
-    palabras_grupo = nombre_grupo.split()
-    palabras_variante = descripcion_limpia.split()
+    # Quitar basura entre paréntesis ej: (M.6)
+    descripcion_limpia = re.sub(r'\s*\([^)]*\)', '', descripcion_limpia)
 
-    matcher = difflib.SequenceMatcher(None, palabras_grupo, palabras_variante, autojunk=False)
+    # ---------------------------------------------------------
+    # 🔥 FASE 1: FRANCOTIRADOR DE MEDIDAS (Regex Prioritario)
+    # ---------------------------------------------------------
+    patron_medidas = r'(?<!\d)\d+(?:/\d+)?\s*(?:"|MM|CM|M|OZ|KG|GR|PULG|LB|LT|L|ML|GAL|W|V|A|HP|DTES\.?|DIENTES)(?!\w)'
+    
+    medidas_grupo = set(re.findall(patron_medidas, nombre_grupo_str))
+    
+    medidas_variante = []
+    for match in re.finditer(patron_medidas, descripcion_limpia):
+        m = match.group().strip()
+        if m not in medidas_grupo and m not in medidas_variante:
+            medidas_variante.append(m)
+    
+    if medidas_variante:
+        return " ".join(medidas_variante)
 
+    # ---------------------------------------------------------
+    # 🔥 FASE 2: DICCIONARIO Y RESTA (Si NO es un producto de medida numérica)
+    # ---------------------------------------------------------
+    marcas_pegadas = ['TRUPER', 'TRUPE', 'PRETUL', 'PRETU', 'FOSET', 'VOLTECK', 'FIERO', 'HERMEX']
+    for marca in marcas_pegadas:
+        descripcion_limpia = descripcion_limpia.replace(marca, ' ')
+
+    basura_erp = [
+        r'\bDE\b', r'\bPARA\b', r'\bTIPO\b', r'\bCON\b', r'\bSIN\b',
+        r'\bC/MANGO\b', r'\bS/MANGO\b', r'\bMGO\.?', r'\bDENTAD\w*', 
+        r'\bP\.PAJA\b', r'\bBLISTER\b', r'\bCAJA\b', r'\bGRANEL\b', 
+        r'\bPAR\b', r'\bJUEGO\b', r'\bSET\b',
+        r'\bPROFE\w*\b', r'\bELECTR\w*\b', r'\bESTAND\w*\b',
+        r'\bMANGO\b', r'\bNARANJA\b', r'\bROJO\b', r'\bNEGRO\b'
+    ]
+
+    texto_filtrado = descripcion_limpia
+    for palabra in basura_erp:
+        texto_filtrado = re.sub(palabra, ' ', texto_filtrado)
+    texto_filtrado = re.sub(r'\s+', ' ', texto_filtrado).strip()
+
+    palabras_grupo = set(nombre_grupo_str.split())
+    palabras_variante = texto_filtrado.split()
+    
     diferencias = []
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag in ('insert', 'replace'):
-            diferencias.extend(palabras_variante[j1:j2])
+    for p_var in palabras_variante:
+        p_var_limpia = p_var.strip('.')
+        if not p_var_limpia:
+            continue
+
+        if p_var_limpia in palabras_grupo or p_var in palabras_grupo:
+            continue
+        
+        es_similar = False
+        p_var_solo_letras = re.sub(r'[^A-Z]', '', p_var_limpia)
+        if len(p_var_solo_letras) > 3:
+            for p_grupo in palabras_grupo:
+                p_grupo_solo_letras = re.sub(r'[^A-Z]', '', p_grupo)
+                if p_grupo_solo_letras and difflib.SequenceMatcher(None, p_grupo_solo_letras, p_var_solo_letras).ratio() > 0.85:
+                    es_similar = True
+                    break
+        if es_similar:
+            continue
+            
+        diferencias.append(p_var)
 
     resultado = " ".join(diferencias).strip(" .,-")
+    resultado = re.sub(r'^[-,\s/]+', '', resultado)
 
-    return resultado if resultado else descripcion_limpia
+    if not resultado:
+        primer_palabra_grupo = nombre_grupo_str.split()[0] if nombre_grupo_str.split() else ""
+        
+        fallback_texto = texto_filtrado
+        if primer_palabra_grupo and primer_palabra_grupo in fallback_texto:
+            fallback_texto = re.sub(r'\b' + re.escape(primer_palabra_grupo) + r'\b', '', fallback_texto, count=1).strip()
+        
+        fallback_texto = re.sub(r'^[-,\s/]+', '', fallback_texto).strip()
+        
+        if fallback_texto:
+            resultado = fallback_texto
+        else:
+            resultado = "--"
+
+    return resultado
 
 def obtener_file_uri(imagen_field):
     if not imagen_field:
@@ -123,7 +207,6 @@ def es_admin(user):
         return True
     raise PermissionDenied
 
-
 # ==========================================
 # VISTA: LISTA DE PRODUCTOS (CATÁLOGO PÚBLICO)
 # ==========================================
@@ -146,9 +229,9 @@ def lista_productos(request):
         )
         .select_related("proveedor")
         .exclude(
-            Q(descripcion__isnull=True) | 
-            Q(descripcion__exact='') | 
-            Q(descripcion__startswith='*') | 
+            Q(descripcion__isnull=True) |
+            Q(descripcion__exact='') |
+            Q(descripcion__startswith='*') |
             Q(descripcion__startswith='(') |
             Q(descripcion__istartswith='tee') |
             Q(descripcion__regex=r'^.$') |
@@ -157,13 +240,15 @@ def lista_productos(request):
             Q(proveedor__marca__iexact='a') |
             Q(proveedor__marca__iexact='KAISER - HEISSNER') |
             Q(proveedor__marca__iexact='HELA') |
-            Q(codigo='17-27-105')
+            Q(codigo='17-27-105') |
+            Q(descripcion__iexact='ANULA FACTURA') |
+            Q(descripcion__iexact='BOLSA')
         )
     )
 
     if marca_seleccionada:
         productos = productos.filter(proveedor__marca__iexact=marca_seleccionada)
-    
+
     if familia_seleccionada:
         productos = productos.filter(codigo__icontains=f"-{familia_seleccionada}")
 
@@ -177,10 +262,16 @@ def lista_productos(request):
 
     productos = productos.order_by("es_truper", "codigo")
 
+    # Mapeo de asignaciones manuales de grupo
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado
+        for item in ProductoGrupoManual.objects.all()
+    }
+
     grupos = OrderedDict()
 
     for p in productos:
-        grupo = p.descripcion_grupo or p.descripcion
+        grupo = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
         familia = None
 
         if p.codigo:
@@ -198,35 +289,32 @@ def lista_productos(request):
                 "nombre": grupo,
                 "marca": marca,
                 "familia": familia,
-                "precio_desde": p.precio_base_pesos,
+                "precio_desde": None,
                 "unidad_medida": p.unidad_medida,
                 "productos": [],
             }
 
         grupos[grupo]["productos"].append(p)
-        precio = p.precio_base_pesos
-
-        if precio is not None:
-            actual = grupos[grupo]["precio_desde"]
-            if actual is None or precio < actual:
-                grupos[grupo]["precio_desde"] = precio
 
     lista_grupos = list(grupos.values())
-    
+
+    for g in lista_grupos:
+        prod_base = g["productos"][0]
+        g["precio_desde"] = prod_base.precio_desde
+
     imagenes_dict = {
-        str(img.grupo_nombre).strip().upper(): img.imagen.url 
+        str(img.grupo_nombre).strip().upper(): img.imagen.url
         for img in ImagenProducto.objects.all() if img.imagen
     }
 
     for g in lista_grupos:
         nombre_limpio = str(g["nombre"]).strip().upper()
         g["imagen_url"] = imagenes_dict.get(nombre_limpio, None)
-        
-        # Leemos el conteo real de variantes desde la vista SQL
+
         prod_base = g["productos"][0]
         cant_var = getattr(prod_base, 'cantidad_variantes', None)
         g["cantidad"] = cant_var if (cant_var is not None and cant_var > 0) else len(g["productos"])
-   
+
     conteo_familias = {}
     conteo_marcas = {}
     for g in lista_grupos:
@@ -264,12 +352,14 @@ def lista_productos(request):
         },
     )
 
-
 @never_cache
 def detalle_producto(request, producto_id):
     producto_base = get_object_or_404(VistaProductoAgrupado.objects.select_related("proveedor"), id=producto_id)
 
-    nombre_grupo = producto_base.descripcion_grupo or producto_base.descripcion
+    # Revisamos si tiene asignación manual
+    override_obj = ProductoGrupoManual.objects.filter(producto_id=producto_base.id).first()
+    nombre_grupo = override_obj.grupo_personalizado if override_obj else (producto_base.descripcion_grupo or producto_base.descripcion)
+    
     marca_grupo = producto_base.proveedor.marca if producto_base.proveedor else ""
     
     info_grupo = ImagenProducto.objects.filter(grupo_nombre=nombre_grupo).first()
@@ -284,22 +374,24 @@ def detalle_producto(request, producto_id):
             except ValueError:
                 imagen_url = info_grupo.imagen
 
-    # Traemos las variantes sin excluir si marca_grupo es vacía o tiene diferencias de caja
     variantes_qs = VistaProductoVariantes.objects.select_related("proveedor").exclude(
         Q(descripcion__isnull=True) | 
         Q(descripcion__exact='') | 
         Q(descripcion__startswith='*') | 
-        Q(descripcion__startswith='(') |
-        Q(descripcion__istartswith='tee') |
-        Q(descripcion__regex=r'^.$') |
-        Q(proveedor__marca__startswith='*') |
-        Q(proveedor__marca__startswith='"') |
-        Q(proveedor__marca__iexact='a') |
-        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(descripcion__startswith='(') | 
+        Q(descripcion__istartswith='tee') | 
+        Q(descripcion__regex=r'^.$') | 
+        Q(proveedor__marca__startswith='*') | 
+        Q(proveedor__marca__startswith='"') | 
+        Q(proveedor__marca__iexact='a') | 
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') | 
         Q(proveedor__marca__iexact='HELA')
     )
 
+    ids_en_grupo = list(ProductoGrupoManual.objects.filter(grupo_personalizado=nombre_grupo).values_list('producto_id', flat=True))
+
     filtros_grupo = (
+        Q(id__in=ids_en_grupo) |
         Q(descripcion_grupo=nombre_grupo) | 
         Q(descripcion=nombre_grupo, descripcion_grupo__isnull=True) | 
         Q(descripcion=nombre_grupo, descripcion_grupo="")
@@ -322,6 +414,7 @@ def detalle_producto(request, producto_id):
             "descripcion_grupo": descripcion_grupo
         },
     )
+
 # ==========================================
 # VISTA: PANEL DASHBOARD PRINCIPAL
 # ==========================================
@@ -334,14 +427,14 @@ def dashboard_productos(request):
         Q(descripcion__isnull=True) | 
         Q(descripcion__exact='') | 
         Q(descripcion__startswith='*') | 
-        Q(descripcion__startswith='(') |
-        Q(descripcion__istartswith='tee') |
-        Q(descripcion__regex=r'^.$') |
-        Q(proveedor__marca__startswith='*') |
-        Q(proveedor__marca__startswith='"') |
-        Q(proveedor__marca__iexact='a') |
-        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-        Q(proveedor__marca__iexact='HELA') |
+        Q(descripcion__startswith='(') | 
+        Q(descripcion__istartswith='tee') | 
+        Q(descripcion__regex=r'^.$') | 
+        Q(proveedor__marca__startswith='*') | 
+        Q(proveedor__marca__startswith='"') | 
+        Q(proveedor__marca__iexact='a') | 
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') | 
+        Q(proveedor__marca__iexact='HELA') | 
         Q(codigo='17-27-105')
     )
 
@@ -368,14 +461,19 @@ def dashboard_productos(request):
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
 
-    nombres_grupos = [p.descripcion_grupo or p.descripcion for p in page_obj.object_list]
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado
+        for item in ProductoGrupoManual.objects.all()
+    }
+
+    nombres_grupos = [overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion) for p in page_obj.object_list]
     info_grupos_qs = ImagenProducto.objects.filter(grupo_nombre__in=nombres_grupos)
     
     imagenes_dict = {img.grupo_nombre: img.imagen.url for img in info_grupos_qs if img.imagen}
     descripciones_dict = {img.grupo_nombre: img.descripcion for img in info_grupos_qs if img.descripcion}
 
     for p in page_obj.object_list:
-        grupo_nombre = p.descripcion_grupo or p.descripcion
+        grupo_nombre = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
         p.imagen_url = imagenes_dict.get(grupo_nombre, None)
         p.descripcion_grupo = descripciones_dict.get(grupo_nombre, "")
         p.grupo_nombre = grupo_nombre
@@ -412,7 +510,7 @@ def editar_producto(request, producto_id):
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
-        grupo_nombre = request.POST.get("grupo_nombre", "").strip().upper() # Forzamos mayúsculas para estandarizar
+        grupo_nombre = request.POST.get("grupo_nombre", "").strip().upper()
         descripcion_grupo = request.POST.get("descripcion_grupo")
 
         try:
@@ -425,7 +523,6 @@ def editar_producto(request, producto_id):
             )
 
             if grupo_nombre:
-                # Normalizamos el nombre del grupo para que siempre coincida
                 img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
                 if ruta_imagen:
                     img_obj.imagen = ruta_imagen
@@ -454,18 +551,23 @@ def menu_exportar(request):
         Q(descripcion__isnull=True) | 
         Q(descripcion__exact='') | 
         Q(descripcion__startswith='*') | 
-        Q(descripcion__startswith='(') |
-        Q(descripcion__istartswith='tee') |
-        Q(descripcion__regex=r'^.$') |
-        Q(proveedor__marca__startswith='*') |
-        Q(proveedor__marca__startswith='"') |
-        Q(proveedor__marca__iexact='a') |
-        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-        Q(proveedor__marca__iexact='HELA') |
+        Q(descripcion__startswith='(') | 
+        Q(descripcion__istartswith='tee') | 
+        Q(descripcion__regex=r'^.$') | 
+        Q(proveedor__marca__startswith='*') | 
+        Q(proveedor__marca__startswith='"') | 
+        Q(proveedor__marca__iexact='a') | 
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') | 
+        Q(proveedor__marca__iexact='HELA') | 
         Q(codigo='17-27-105')
     ).order_by('descripcion_grupo')
     
     familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado
+        for item in ProductoGrupoManual.objects.all()
+    }
+    
     arbol_familias = {}
 
     for p in productos:
@@ -475,7 +577,7 @@ def menu_exportar(request):
             if len(partes) >= 2:
                 familia_desc = familias_dict.get(partes[1], "Sin Familia")
 
-        grupo = p.descripcion_grupo or p.descripcion
+        grupo = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
         if familia_desc not in arbol_familias:
             arbol_familias[familia_desc] = set()
         arbol_familias[familia_desc].add(grupo)
@@ -540,13 +642,13 @@ def descargar_catalogo_version(request, catalogo_id):
         filename=nombre_archivo,
         content_type='application/pdf',
     )
+
 @never_cache
 @login_required(login_url='/login/')
 def eliminar_catalogo(request, catalogo_id):
     if not request.user.is_superuser:
         raise PermissionDenied
 
-    # Usamos filter en lugar de get_object_or_404 para evitar MultipleObjectsReturned
     catalogos = CatalogCache.objects.filter(pk=catalogo_id)
 
     if not catalogos.exists():
@@ -560,7 +662,6 @@ def eliminar_catalogo(request, catalogo_id):
     for catalogo in catalogos:
         version_num = catalogo.version_number
         if catalogo.pdf_file:
-            # Borra el archivo físico del servidor sin guardar el modelo antes de eliminarlo
             catalogo.pdf_file.delete(save=False)
         catalogo.delete()
 
@@ -569,6 +670,7 @@ def eliminar_catalogo(request, catalogo_id):
         f"La versión {version_num or catalogo_id} del catálogo y su archivo PDF fueron eliminados para liberar espacio."
     )
     return redirect('historial_catalogo')
+
 # ==========================================
 # GESTIÓN DE VIGENCIA Y BLOQUEO DE CATÁLOGOS
 # ==========================================
@@ -616,8 +718,21 @@ def generar_pdf(request):
             messages.error(request, "Debes seleccionar al menos un grupo para generar el catálogo.")
             return redirect('menu_exportar')
 
+        # 1. Obtenemos el diccionario completo de reasignaciones manuales
+        overrides_dict = {
+            item.producto_id: item
+            for item in ProductoGrupoManual.objects.all()
+        }
+
+        # IDs que fueron reasignados manualmente a alguno de los grupos seleccionados
+        ids_con_override = [
+            pid for pid, item in overrides_dict.items()
+            if item.grupo_personalizado in grupos_seleccionados
+        ]
+
+        # 2. Consultamos tanto por el grupo SQL como por los productos reasignados manualmente
         qs = VistaProductoVariantes.objects.select_related("proveedor").filter(
-            descripcion_grupo__in=grupos_seleccionados
+            Q(descripcion_grupo__in=grupos_seleccionados) | Q(id__in=ids_con_override)
         ).annotate(
             es_truper=Case(
                 When(proveedor__marca__iexact='truper', then=Value(0)),
@@ -626,20 +741,41 @@ def generar_pdf(request):
             )
         )
 
-        productos = list(qs)
+        productos_raw = list(qs)
         familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
 
-        for p in productos:
+        productos = []
+        for p in productos_raw:
+            override_item = overrides_dict.get(p.id)
+            
+            # Determinamos el grupo final del producto (manual o automático)
+            grupo_final = override_item.grupo_personalizado if override_item else (p.descripcion_grupo or p.descripcion)
+
+            # Si el producto fue movido a otro grupo que NO está en grupos_seleccionados, lo descartamos
+            if grupo_final not in grupos_seleccionados:
+                continue
+
+            p.grupo_final = grupo_final
+
             p.familia_temporal = "Sin Familia"
             if p.codigo and "-" in p.codigo:
                 partes = p.codigo.split("-")
                 if len(partes) >= 2:
                     p.familia_temporal = familias_dict.get(partes[1], "Sin Familia")
 
+            # Asignamos la medida: si fue editada a mano usamos esa, sino usamos extraer_medida
+            if override_item and override_item.nombre_limpio_personalizado:
+                p.medida_mostrar = override_item.nombre_limpio_personalizado
+            else:
+                p.medida_mostrar = extraer_medida(p.grupo_final, p.descripcion or "", p.codigo_de_origen or "")
+
+            productos.append(p)
+
+        # 3. Ordenamos respetando el grupo final
         productos.sort(key=lambda p: (
             p.es_truper,
             p.familia_temporal,
-            p.descripcion_grupo or p.descripcion or "",
+            p.grupo_final or "",
             p.codigo
         ))
 
@@ -658,7 +794,7 @@ def generar_pdf(request):
         for p in productos:
             marca_grupo = "Truper" if p.es_truper == 0 else "Otras Marcas"
             familia = p.familia_temporal
-            grupo = p.descripcion_grupo or p.descripcion
+            grupo = p.grupo_final
 
             familias_de_marca = catalogo[marca_grupo]
             if familia not in familias_de_marca:
@@ -670,8 +806,6 @@ def generar_pdf(request):
                     'descripcion': descripciones_dict.get(grupo, ""),
                     'variantes': []
                 }
-
-            p.medida_mostrar = extraer_medida(grupo, p.descripcion or "", p.codigo_de_origen or "")
 
             if p.es_truper != 0:
                 p.empaque_inner = None
@@ -927,7 +1061,6 @@ def generar_pdf(request):
             catalogos_existentes = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').order_by('version_number')
             texto_tipo = "con precio"
 
-        # --- BORRADO DEL MÁS ANTIGUO (mantiene máximo 3 por tipo) ---
         if catalogos_existentes.count() >= 3:
             catalogo_mas_antiguo = catalogos_existentes.first()
             if catalogo_mas_antiguo.pdf_file:
@@ -938,7 +1071,6 @@ def generar_pdf(request):
             catalogo_mas_antiguo.delete()
             messages.warning(request, f"Se ha eliminado el catálogo {texto_tipo} más antiguo para liberar espacio.")
 
-        # --- RED DE SEGURIDAD: limpia huérfanos que no coincidan con la BD ---
         limpiar_pdfs_huerfanos(sin_precio)
 
         ultima_version = CatalogCache.objects.order_by('-version_number').first()
@@ -959,11 +1091,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 def limpiar_pdfs_huerfanos(sin_precio):
-    """
-    Red de seguridad: recorre media/catalogos/ y elimina físicamente
-    cualquier PDF del tipo indicado que ya no tenga un registro
-    correspondiente en CatalogCache (huérfanos históricos o fallos de borrado).
-    """
     carpeta = os.path.join(settings.MEDIA_ROOT, 'catalogos')
     if not os.path.isdir(carpeta):
         return
@@ -994,5 +1121,138 @@ def limpiar_pdfs_huerfanos(sin_precio):
             except OSError as e:
                 logger.warning(f"[limpieza catalogos] No se pudo eliminar {nombre_archivo}: {e}")
 
+# ==========================================
+# VISTA: GESTIÓN Y REASIGNACIÓN DE GRUPOS (PÁGINA APARTE)
+# ==========================================
+@never_cache
+@login_required(login_url='/login/')
+@permission_required('prueba.change_producto', login_url='login')
+def gestionar_grupos(request):
+    if request.method == "POST":
+        accion = request.POST.get("accion")
 
+        # ----------------------------------------------------
+        # 1. GUARDAR UN SOLO PRODUCTO (INDIVIDUAL)
+        # ----------------------------------------------------
+        if accion == "guardar_individual":
+            p_id = request.POST.get("producto_id_individual")
+            nueva_desc = request.POST.get("nueva_descripcion_individual", "").strip()
+            nuevo_grp = request.POST.get("nuevo_grupo_individual", "").strip().upper()
+            nuevo_limpio = request.POST.get("nuevo_nombre_limpio_individual", "").strip()
 
+            if p_id:
+                if nueva_desc:
+                    Producto.objects.filter(field_id=p_id).update(descripcion=nueva_desc)
+
+                if nuevo_grp or nuevo_limpio:
+                    ProductoGrupoManual.objects.update_or_create(
+                        producto_id=p_id,
+                        defaults={
+                            'grupo_personalizado': nuevo_grp,
+                            'nombre_limpio_personalizado': nuevo_limpio if nuevo_limpio else None
+                        }
+                    )
+                messages.success(request, f"Producto #{p_id} guardado correctamente.")
+
+        # ----------------------------------------------------
+        # 2. GUARDAR TODA LA PÁGINA (MASIVO)
+        # ----------------------------------------------------
+        elif accion == "guardar_pagina":
+            producto_ids = request.POST.getlist("producto_id[]")
+            descripciones = request.POST.getlist("nueva_descripcion[]")
+            grupos = request.POST.getlist("nuevo_grupo[]")
+            nombres_limpios = request.POST.getlist("nuevo_nombre_limpio[]")
+
+            for i, p_id in enumerate(producto_ids):
+                if not p_id:
+                    continue
+
+                nueva_desc = descripciones[i].strip() if i < len(descripciones) else ""
+                nuevo_grp = grupos[i].strip().upper() if i < len(grupos) else ""
+                nuevo_limpio = nombres_limpios[i].strip() if i < len(nombres_limpios) else ""
+
+                if nueva_desc:
+                    Producto.objects.filter(field_id=p_id).update(descripcion=nueva_desc)
+
+                if nuevo_grp or nuevo_limpio:
+                    ProductoGrupoManual.objects.update_or_create(
+                        producto_id=p_id,
+                        defaults={
+                            'grupo_personalizado': nuevo_grp,
+                            'nombre_limpio_personalizado': nuevo_limpio if nuevo_limpio else None
+                        }
+                    )
+
+            messages.success(request, f"Se han guardado y actualizado los {len(producto_ids)} productos de esta página.")
+
+        # ----------------------------------------------------
+        # 3. RESTAURAR INDIVIDUAL
+        # ----------------------------------------------------
+        elif accion == "restaurar_individual":
+            prod_id_restaurar = request.POST.get("producto_id_restaurar")
+            if prod_id_restaurar:
+                ProductoGrupoManual.objects.filter(producto_id=prod_id_restaurar).delete()
+                messages.success(request, f"Producto #{prod_id_restaurar} restaurado a sus valores automáticos.")
+
+        return redirect(request.META.get('HTTP_REFERER', 'gestionar_grupos'))
+
+    texto_busqueda = request.GET.get("q", "").strip()
+
+    productos_qs = VistaProductoVariantes.objects.select_related("proveedor").exclude(
+        Q(descripcion__isnull=True) |
+        Q(descripcion__exact='') |
+        Q(descripcion__startswith='*') |
+        Q(descripcion__startswith='(') |
+        Q(descripcion__istartswith='tee') |
+        Q(descripcion__regex=r'^.$') |
+        Q(proveedor__marca__startswith='*') |
+        Q(proveedor__marca__startswith='"') |
+        Q(proveedor__marca__iexact='a') |
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(proveedor__marca__iexact='HELA') |
+        Q(codigo='17-27-105')
+    ).order_by('codigo')
+
+    if texto_busqueda:
+        productos_qs = productos_qs.filter(
+            Q(descripcion__icontains=texto_busqueda) |
+            Q(descripcion_grupo__icontains=texto_busqueda) |
+            Q(codigo__icontains=texto_busqueda) |
+            Q(proveedor__marca__icontains=texto_busqueda)
+        )
+
+    overrides = {
+        item.producto_id: item
+        for item in ProductoGrupoManual.objects.all()
+    }
+
+    grupos_sql = set(
+        VistaProductoAgrupado.objects.exclude(descripcion_grupo__isnull=True)
+        .exclude(descripcion_grupo__exact="")
+        .values_list("descripcion_grupo", flat=True)
+    )
+    grupos_manuales = set(ProductoGrupoManual.objects.values_list("grupo_personalizado", flat=True))
+    todos_los_grupos = sorted(list(grupos_sql.union(grupos_manuales)))
+
+    paginator = Paginator(productos_qs, 25)
+    page = request.GET.get("page")
+    page_obj = paginator.get_page(page)
+
+    for p in page_obj.object_list:
+        override_obj = overrides.get(p.id, None)
+        p.grupo_manual = override_obj.grupo_personalizado if override_obj else None
+        p.grupo_activo = p.grupo_manual or p.descripcion_grupo or p.descripcion
+        
+        if override_obj and override_obj.nombre_limpio_personalizado:
+            p.nombre_limpio = override_obj.nombre_limpio_personalizado
+            p.nombre_limpio_es_manual = True
+        else:
+            p.nombre_limpio = extraer_medida(p.grupo_activo, p.descripcion or "", p.codigo_de_origen or "")
+            p.nombre_limpio_es_manual = False
+
+    return render(request, "gestionar_grupos.html", {
+        "page_obj": page_obj,
+        "productos": page_obj,
+        "busqueda": texto_busqueda,
+        "todos_los_grupos": todos_los_grupos,
+    })

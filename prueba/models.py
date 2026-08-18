@@ -78,6 +78,7 @@ class VistaProductoAgrupado(models.Model):
     empaque_master = models.CharField(max_length=100, null=True, blank=True)
     cantidad_variantes = models.IntegerField(null=True, blank=True)
     empaque_pallet = models.CharField(max_length=100, null=True, blank=True)
+    precio_desde = models.FloatField(blank=True, null=True)
 
     proveedor = models.ForeignKey(
         "Proveedor",
@@ -174,6 +175,7 @@ class CatalogCache(models.Model):
     def __str__(self):
         return f"Catálogo v{self.version_number} - {'Actual' if self.is_current else 'Anterior'}"
     
+
 class HistorialCatalogo(models.Model):
     nombre = models.CharField(max_length=200, verbose_name="Nombre del Catálogo")
     archivo_pdf = models.FileField(upload_to='catalogos_pdf/', verbose_name="Archivo PDF")
@@ -191,3 +193,23 @@ class HistorialCatalogo(models.Model):
         if self.archivo_pdf and os.path.isfile(self.archivo_pdf.path):
             os.remove(self.archivo_pdf.path)
         super().delete(*args, **kwargs)
+
+
+# =====================================================================
+# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
+# =====================================================================
+# =====================================================================
+# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
+# =====================================================================
+class ProductoGrupoManual(models.Model):
+    producto_id = models.IntegerField(unique=True, db_index=True)
+    grupo_personalizado = models.CharField(max_length=255)
+    nombre_limpio_personalizado = models.CharField(max_length=255, null=True, blank=True)
+    actualizado_el = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Grupo Manual de Producto"
+        verbose_name_plural = "Grupos Manuales de Productos"
+
+    def __str__(self):
+        return f"Prod #{self.producto_id} -> {self.grupo_personalizado} ({self.nombre_limpio_personalizado})"
