@@ -5,7 +5,7 @@ import base64
 import mimetypes
 import tempfile
 import re
-
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import permission_required, login_required, user_passes_test
 from django.core.paginator import Paginator
@@ -24,8 +24,8 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.utils.text import slugify
 
-# AQUÍ IMPORTAMOS EL NUEVO MODELO VistaProductoVariantes
-from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes
+# AQUÍ IMPORTAMOS EL NUEVO MODELO VistaProductoVariantes Y ProductoGrupoManual
+from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes, ProductoGrupoManual
 
 # ==========================================
 # FUNCIONES AUXILIARES
@@ -60,33 +60,114 @@ def obtener_base64_imagen(ruta_imagen):
                 
     return ruta_imagen
 
-
 def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_origen: str = "") -> str:
     if not nombre_grupo or not descripcion_variante:
-        return descripcion_variante or ""
+        return "--"
 
-    descripcion_limpia = descripcion_variante.strip()
+    nombre_grupo_str = str(nombre_grupo).strip().upper()
+    descripcion_limpia = str(descripcion_variante).strip().upper()
+
+    # 1. DESTRUCTOR DE PUNTOS SUSPENSIVOS
+    descripcion_limpia = descripcion_limpia.replace('…', ' ').replace('...', ' ')
+    nombre_grupo_str = nombre_grupo_str.replace('…', ' ').replace('...', ' ')
+
+    # 🔥 2. SEPARADOR INTELIGENTE: Despega números y comillas de las letras
+    # Convierte 'ESTAND.18"' -> 'ESTAND. 18"' para que Python pueda leer el número solo
+    descripcion_limpia = re.sub(r'([A-Z\.])(\d)', r'\1 \2', descripcion_limpia)
+    # Convierte '18"MANGO' -> '18" MANGO'
+    descripcion_limpia = re.sub(r'(\d|")([A-Z])', r'\1 \2', descripcion_limpia)
 
     if codigo_de_origen:
-        codigo_de_origen = codigo_de_origen.strip()
+        codigo_de_origen = str(codigo_de_origen).strip().upper()
         if codigo_de_origen and descripcion_limpia.startswith(codigo_de_origen):
             descripcion_limpia = descripcion_limpia[len(codigo_de_origen):].strip()
 
+    # Quitar códigos numéricos internos iniciales (ej: 15885, 12350)
     descripcion_limpia = re.sub(r'^\d{3,7}\s+', '', descripcion_limpia)
 
-    palabras_grupo = nombre_grupo.split()
-    palabras_variante = descripcion_limpia.split()
+    # Quitar basura entre paréntesis ej: (M.6)
+    descripcion_limpia = re.sub(r'\s*\([^)]*\)', '', descripcion_limpia)
 
-    matcher = difflib.SequenceMatcher(None, palabras_grupo, palabras_variante, autojunk=False)
+    # ---------------------------------------------------------
+    # 🔥 FASE 1: FRANCOTIRADOR DE MEDIDAS (Regex Prioritario)
+    # ---------------------------------------------------------
+    patron_medidas = r'(?<!\d)\d+(?:/\d+)?\s*(?:"|MM|CM|M|OZ|KG|GR|PULG|LB|LT|L|ML|GAL|W|V|A|HP|DTES\.?|DIENTES)(?!\w)'
+    
+    medidas_grupo = set(re.findall(patron_medidas, nombre_grupo_str))
+    
+    medidas_variante = []
+    for match in re.finditer(patron_medidas, descripcion_limpia):
+        m = match.group().strip()
+        if m not in medidas_grupo and m not in medidas_variante:
+            medidas_variante.append(m)
+    
+    if medidas_variante:
+        return " ".join(medidas_variante)
 
+    # ---------------------------------------------------------
+    # 🔥 FASE 2: DICCIONARIO Y RESTA (Si NO es un producto de medida numérica)
+    # ---------------------------------------------------------
+    marcas_pegadas = ['TRUPER', 'TRUPE', 'PRETUL', 'PRETU', 'FOSET', 'VOLTECK', 'FIERO', 'HERMEX']
+    for marca in marcas_pegadas:
+        descripcion_limpia = descripcion_limpia.replace(marca, ' ')
+
+    basura_erp = [
+        r'\bDE\b', r'\bPARA\b', r'\bTIPO\b', r'\bCON\b', r'\bSIN\b',
+        r'\bC/MANGO\b', r'\bS/MANGO\b', r'\bMGO\.?', r'\bDENTAD\w*', 
+        r'\bP\.PAJA\b', r'\bBLISTER\b', r'\bCAJA\b', r'\bGRANEL\b', 
+        r'\bPAR\b', r'\bJUEGO\b', r'\bSET\b',
+        r'\bPROFE\w*\b', r'\bELECTR\w*\b', r'\bESTAND\w*\b',
+        r'\bMANGO\b', r'\bNARANJA\b', r'\bROJO\b', r'\bNEGRO\b'
+    ]
+
+    texto_filtrado = descripcion_limpia
+    for palabra in basura_erp:
+        texto_filtrado = re.sub(palabra, ' ', texto_filtrado)
+    texto_filtrado = re.sub(r'\s+', ' ', texto_filtrado).strip()
+
+    palabras_grupo = set(nombre_grupo_str.split())
+    palabras_variante = texto_filtrado.split()
+    
     diferencias = []
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag in ('insert', 'replace'):
-            diferencias.extend(palabras_variante[j1:j2])
+    for p_var in palabras_variante:
+        p_var_limpia = p_var.strip('.')
+        if not p_var_limpia:
+            continue
+
+        if p_var_limpia in palabras_grupo or p_var in palabras_grupo:
+            continue
+        
+        es_similar = False
+        p_var_solo_letras = re.sub(r'[^A-Z]', '', p_var_limpia)
+        if len(p_var_solo_letras) > 3:
+            for p_grupo in palabras_grupo:
+                p_grupo_solo_letras = re.sub(r'[^A-Z]', '', p_grupo)
+                if p_grupo_solo_letras and difflib.SequenceMatcher(None, p_grupo_solo_letras, p_var_solo_letras).ratio() > 0.85:
+                    es_similar = True
+                    break
+        if es_similar:
+            continue
+            
+        diferencias.append(p_var)
 
     resultado = " ".join(diferencias).strip(" .,-")
+    resultado = re.sub(r'^[-,\s/]+', '', resultado)
 
-    return resultado if resultado else descripcion_limpia
+    if not resultado:
+        primer_palabra_grupo = nombre_grupo_str.split()[0] if nombre_grupo_str.split() else ""
+        
+        fallback_texto = texto_filtrado
+        if primer_palabra_grupo and primer_palabra_grupo in fallback_texto:
+            fallback_texto = re.sub(r'\b' + re.escape(primer_palabra_grupo) + r'\b', '', fallback_texto, count=1).strip()
+        
+        fallback_texto = re.sub(r'^[-,\s/]+', '', fallback_texto).strip()
+        
+        if fallback_texto:
+            resultado = fallback_texto
+        else:
+            resultado = "--"
+
+    return resultado
 
 def obtener_file_uri(imagen_field):
     if not imagen_field:
@@ -123,7 +204,6 @@ def es_admin(user):
         return True
     raise PermissionDenied
 
-
 # ==========================================
 # VISTA: LISTA DE PRODUCTOS (CATÁLOGO PÚBLICO)
 # ==========================================
@@ -146,9 +226,8 @@ def lista_productos(request):
         )
         .select_related("proveedor")
         .exclude(
-            Q(descripcion__isnull=True) | 
-            Q(descripcion__exact='') | 
-            Q(descripcion__startswith='*') | 
+            Q(descripcion__isnull=True) |
+            Q(descripcion__exact='') |
             Q(descripcion__startswith='(') |
             Q(descripcion__istartswith='tee') |
             Q(descripcion__regex=r'^.$') |
@@ -157,30 +236,50 @@ def lista_productos(request):
             Q(proveedor__marca__iexact='a') |
             Q(proveedor__marca__iexact='KAISER - HEISSNER') |
             Q(proveedor__marca__iexact='HELA') |
-            Q(codigo='17-27-105')
+            Q(codigo='17-27-105') |
+            Q(descripcion__iexact='ANULA FACTURA') |
+            Q(descripcion__iexact='BOLSA')
         )
     )
 
     if marca_seleccionada:
         productos = productos.filter(proveedor__marca__iexact=marca_seleccionada)
-    
+
     if familia_seleccionada:
         productos = productos.filter(codigo__icontains=f"-{familia_seleccionada}")
 
     if texto_busqueda:
-        productos = productos.filter(
-            Q(descripcion__icontains=texto_busqueda) |
-            Q(descripcion_grupo__icontains=texto_busqueda) |
-            Q(codigo__icontains=texto_busqueda) |
-            Q(proveedor__marca__icontains=texto_busqueda)
-        )
+        terminos = texto_busqueda.split()
+        for termino in terminos:
+            grupos_por_variante = list(
+                VistaProductoVariantes.objects.filter(
+                    Q(codigo__icontains=termino) |
+                    Q(codigo_de_origen__icontains=termino)
+                ).values_list('descripcion_grupo', flat=True).distinct()
+            )
+
+            productos = productos.filter(
+                Q(descripcion__icontains=termino) |
+                Q(descripcion_grupo__icontains=termino) |
+                Q(codigo__icontains=termino) |
+                Q(codigo_de_origen__icontains=termino) |
+                Q(familia_nombre__icontains=termino) |
+                Q(unidad_medida__icontains=termino) |
+                Q(proveedor__marca__icontains=termino) |
+                Q(descripcion_grupo__in=grupos_por_variante)
+            )
 
     productos = productos.order_by("es_truper", "codigo")
+
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado
+        for item in ProductoGrupoManual.objects.all()
+    }
 
     grupos = OrderedDict()
 
     for p in productos:
-        grupo = p.descripcion_grupo or p.descripcion
+        grupo = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
         familia = None
 
         if p.codigo:
@@ -198,35 +297,44 @@ def lista_productos(request):
                 "nombre": grupo,
                 "marca": marca,
                 "familia": familia,
-                "precio_desde": p.precio_base_pesos,
+                "precio_desde": None,
                 "unidad_medida": p.unidad_medida,
                 "productos": [],
             }
 
         grupos[grupo]["productos"].append(p)
-        precio = p.precio_base_pesos
-
-        if precio is not None:
-            actual = grupos[grupo]["precio_desde"]
-            if actual is None or precio < actual:
-                grupos[grupo]["precio_desde"] = precio
 
     lista_grupos = list(grupos.values())
-    
+
+    for g in lista_grupos:
+        prod_base = g["productos"][0]
+        g["precio_desde"] = prod_base.precio_desde
+
     imagenes_dict = {
-        str(img.grupo_nombre).strip().upper(): img.imagen.url 
+        str(img.grupo_nombre).strip().upper(): img.imagen.url
         for img in ImagenProducto.objects.all() if img.imagen
+    }
+
+    destacados_dict = {
+        str(img.grupo_nombre).strip().upper(): {
+            'es_destacado': img.es_destacado,
+            'etiqueta': img.etiqueta_destacado or "DESTACADO"
+        }
+        for img in ImagenProducto.objects.all()
     }
 
     for g in lista_grupos:
         nombre_limpio = str(g["nombre"]).strip().upper()
         g["imagen_url"] = imagenes_dict.get(nombre_limpio, None)
         
-        # Leemos el conteo real de variantes desde la vista SQL
+        info_dest = destacados_dict.get(nombre_limpio, {'es_destacado': False, 'etiqueta': ''})
+        g["es_destacado"] = info_dest['es_destacado']
+        g["etiqueta_destacado"] = info_dest['etiqueta']
+
         prod_base = g["productos"][0]
         cant_var = getattr(prod_base, 'cantidad_variantes', None)
         g["cantidad"] = cant_var if (cant_var is not None and cant_var > 0) else len(g["productos"])
-   
+
     conteo_familias = {}
     conteo_marcas = {}
     for g in lista_grupos:
@@ -264,12 +372,15 @@ def lista_productos(request):
         },
     )
 
-
 @never_cache
+@login_required(login_url='/login/')
 def detalle_producto(request, producto_id):
     producto_base = get_object_or_404(VistaProductoAgrupado.objects.select_related("proveedor"), id=producto_id)
 
-    nombre_grupo = producto_base.descripcion_grupo or producto_base.descripcion
+    # Revisamos si tiene asignación manual
+    override_obj = ProductoGrupoManual.objects.filter(producto_id=producto_base.id).first()
+    nombre_grupo = override_obj.grupo_personalizado if override_obj else (producto_base.descripcion_grupo or producto_base.descripcion)
+    
     marca_grupo = producto_base.proveedor.marca if producto_base.proveedor else ""
     
     info_grupo = ImagenProducto.objects.filter(grupo_nombre=nombre_grupo).first()
@@ -284,22 +395,23 @@ def detalle_producto(request, producto_id):
             except ValueError:
                 imagen_url = info_grupo.imagen
 
-    # Traemos las variantes sin excluir si marca_grupo es vacía o tiene diferencias de caja
     variantes_qs = VistaProductoVariantes.objects.select_related("proveedor").exclude(
         Q(descripcion__isnull=True) | 
         Q(descripcion__exact='') | 
-        Q(descripcion__startswith='*') | 
-        Q(descripcion__startswith='(') |
-        Q(descripcion__istartswith='tee') |
-        Q(descripcion__regex=r'^.$') |
-        Q(proveedor__marca__startswith='*') |
-        Q(proveedor__marca__startswith='"') |
-        Q(proveedor__marca__iexact='a') |
-        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(descripcion__startswith='(') | 
+        Q(descripcion__istartswith='tee') | 
+        Q(descripcion__regex=r'^.$') | 
+        Q(proveedor__marca__startswith='*') | 
+        Q(proveedor__marca__startswith='"') | 
+        Q(proveedor__marca__iexact='a') | 
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') | 
         Q(proveedor__marca__iexact='HELA')
     )
 
+    ids_en_grupo = list(ProductoGrupoManual.objects.filter(grupo_personalizado=nombre_grupo).values_list('producto_id', flat=True))
+
     filtros_grupo = (
+        Q(id__in=ids_en_grupo) |
         Q(descripcion_grupo=nombre_grupo) | 
         Q(descripcion=nombre_grupo, descripcion_grupo__isnull=True) | 
         Q(descripcion=nombre_grupo, descripcion_grupo="")
@@ -322,9 +434,11 @@ def detalle_producto(request, producto_id):
             "descripcion_grupo": descripcion_grupo
         },
     )
+
 # ==========================================
 # VISTA: PANEL DASHBOARD PRINCIPAL
 # ==========================================
+
 @never_cache
 @login_required(login_url='/login/')
 def dashboard_productos(request):
@@ -333,16 +447,17 @@ def dashboard_productos(request):
     productos_base_qs = VistaProductoAgrupado.objects.exclude(
         Q(descripcion__isnull=True) | 
         Q(descripcion__exact='') | 
-        Q(descripcion__startswith='*') | 
-        Q(descripcion__startswith='(') |
-        Q(descripcion__istartswith='tee') |
-        Q(descripcion__regex=r'^.$') |
-        Q(proveedor__marca__startswith='*') |
-        Q(proveedor__marca__startswith='"') |
-        Q(proveedor__marca__iexact='a') |
-        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-        Q(proveedor__marca__iexact='HELA') |
-        Q(codigo='17-27-105')
+        Q(descripcion__startswith='(') | 
+        Q(descripcion__istartswith='tee') | 
+        Q(descripcion__regex=r'^.$') | 
+        Q(proveedor__marca__startswith='*') | 
+        Q(proveedor__marca__startswith='"') | 
+        Q(proveedor__marca__iexact='a') | 
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') | 
+        Q(proveedor__marca__iexact='HELA') | 
+        Q(codigo='17-27-105') |
+        Q(descripcion__iexact='ANULA FACTURA') |
+        Q(descripcion__iexact='BOLSA')
     )
 
     kpi_productos_activos = productos_base_qs.count()
@@ -358,26 +473,39 @@ def dashboard_productos(request):
     productos_qs = productos_base_qs.select_related("proveedor").order_by("descripcion")
 
     if texto_busqueda:
-        productos_qs = productos_qs.filter(
-            Q(descripcion__icontains=texto_busqueda) |
-            Q(codigo__icontains=texto_busqueda) |
-            Q(proveedor__marca__icontains=texto_busqueda)
-        )
+        terminos = texto_busqueda.split()
+        for termino in terminos:
+            productos_qs = productos_qs.filter(
+                Q(descripcion__icontains=termino) |
+                Q(descripcion_grupo__icontains=termino) |
+                Q(codigo__icontains=termino) |
+                Q(codigo_de_origen__icontains=termino) |
+                Q(proveedor__marca__icontains=termino)
+            )
 
+    # 1. Obtener overrides manuales
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado
+        for item in ProductoGrupoManual.objects.all()
+    }
+
+    # 2. Paginación directa
     paginator = Paginator(productos_qs, 20)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
 
-    nombres_grupos = [p.descripcion_grupo or p.descripcion for p in page_obj.object_list]
+    # 3. Cruzar con ImagenProducto sin borrar descripcion_grupo original si no existe personalizada
+    nombres_grupos = [overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion) for p in page_obj.object_list]
     info_grupos_qs = ImagenProducto.objects.filter(grupo_nombre__in=nombres_grupos)
     
     imagenes_dict = {img.grupo_nombre: img.imagen.url for img in info_grupos_qs if img.imagen}
     descripciones_dict = {img.grupo_nombre: img.descripcion for img in info_grupos_qs if img.descripcion}
 
     for p in page_obj.object_list:
-        grupo_nombre = p.descripcion_grupo or p.descripcion
+        grupo_nombre = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
         p.imagen_url = imagenes_dict.get(grupo_nombre, None)
-        p.descripcion_grupo = descripciones_dict.get(grupo_nombre, "")
+        # Si no hay descripción personalizada en ImagenProducto, mantenemos la original de la base de datos
+        p.descripcion_grupo = descripciones_dict.get(grupo_nombre, p.descripcion_grupo or "")
         p.grupo_nombre = grupo_nombre
         p.field_id = p.id
 
@@ -400,8 +528,6 @@ def dashboard_productos(request):
             "catalogo_vigente_sin_precio": catalogo_vigente_sin_precio,
         }
     )
-
-
 # ==========================================
 # OTRAS VISTAS DEL SISTEMA
 # ==========================================
@@ -412,7 +538,7 @@ def editar_producto(request, producto_id):
         precio = request.POST.get("precio_base_pesos")
         stock = request.POST.get("stock_disponible")
         ruta_imagen = request.POST.get("ruta_imagen_producto", "").strip()
-        grupo_nombre = request.POST.get("grupo_nombre", "").strip().upper() # Forzamos mayúsculas para estandarizar
+        grupo_nombre = request.POST.get("grupo_nombre", "").strip().upper()
         descripcion_grupo = request.POST.get("descripcion_grupo")
 
         try:
@@ -425,7 +551,6 @@ def editar_producto(request, producto_id):
             )
 
             if grupo_nombre:
-                # Normalizamos el nombre del grupo para que siempre coincida
                 img_obj, created = ImagenProducto.objects.get_or_create(grupo_nombre=grupo_nombre)
                 if ruta_imagen:
                     img_obj.imagen = ruta_imagen
@@ -448,49 +573,84 @@ def logout_view(request):
 
 @never_cache
 @login_required(login_url='/login/')
-@user_passes_test(es_admin)
+@user_passes_test(lambda u: u.is_superuser)
 def menu_exportar(request):
+    proveedores_excluidos_ids = Proveedor.objects.filter(
+        Q(marca__startswith='*') |
+        Q(marca__startswith='"') |
+        Q(marca__iexact='a') |
+        Q(marca__iexact='KAISER - HEISSNER') |
+        Q(marca__iexact='HELA')
+    ).values_list('field_id', flat=True)
+
     productos = VistaProductoAgrupado.objects.exclude(
-        Q(descripcion__isnull=True) | 
-        Q(descripcion__exact='') | 
-        Q(descripcion__startswith='*') | 
-        Q(descripcion__startswith='(') |
-        Q(descripcion__istartswith='tee') |
-        Q(descripcion__regex=r'^.$') |
-        Q(proveedor__marca__startswith='*') |
-        Q(proveedor__marca__startswith='"') |
-        Q(proveedor__marca__iexact='a') |
-        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
-        Q(proveedor__marca__iexact='HELA') |
+        Q(descripcion_grupo__isnull=True) |
+        Q(descripcion_grupo__exact='') |
+        Q(descripcion_grupo__startswith='*') |
+        Q(descripcion_grupo__startswith='(') |
+        Q(descripcion_grupo__istartswith='tee') |
+        Q(descripcion_grupo__regex=r'^.$') |
+        Q(proveedor__in=proveedores_excluidos_ids) |
         Q(codigo='17-27-105')
     ).order_by('descripcion_grupo')
-    
+
+    # 1. Traer el diccionario de Overrides Manuales
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado 
+        for item in ProductoGrupoManual.objects.all()
+    }
+
     familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
-    arbol_familias = {}
+
+    arbol_todo = {}
+    arbol_truper = {}
+    arbol_ecosa = {}
 
     for p in productos:
         familia_desc = "Sin Familia"
+        es_truper = False
         if p.codigo and "-" in p.codigo:
             partes = p.codigo.split("-")
             if len(partes) >= 2:
                 familia_desc = familias_dict.get(partes[1], "Sin Familia")
+            if partes[0] in ['17', '18']:
+                es_truper = True
 
-        grupo = p.descripcion_grupo or p.descripcion
-        if familia_desc not in arbol_familias:
-            arbol_familias[familia_desc] = set()
-        arbol_familias[familia_desc].add(grupo)
+        # 2. Tomar el nombre manual si existe, o el de SQL por defecto
+        grupo = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
+        if not grupo:
+            continue
 
-    for f in arbol_familias:
-        arbol_familias[f] = sorted(list(arbol_familias[f]))
+        # Árbol Completo
+        if familia_desc not in arbol_todo:
+            arbol_todo[familia_desc] = set()
+        arbol_todo[familia_desc].add(grupo)
 
-    arbol_familias = dict(sorted(arbol_familias.items()))
+        # Árbol Truper vs Ecosa (Resto)
+        if es_truper:
+            if familia_desc not in arbol_truper:
+                arbol_truper[familia_desc] = set()
+            arbol_truper[familia_desc].add(grupo)
+        else:
+            if familia_desc not in arbol_ecosa:
+                arbol_ecosa[familia_desc] = set()
+            arbol_ecosa[familia_desc].add(grupo)
+
+    # Ordenamiento alfabético de los diccionarios
+    def ordenar_arbol(arbol):
+        for f in arbol:
+            arbol[f] = sorted(list(arbol[f]))
+        return dict(sorted(arbol.items()))
+
     cantidad_catalogos = CatalogCache.objects.count()
 
     return render(request, 'exportar.html', {
-        'arbol_familias': arbol_familias,
+        'arbol_todo': ordenar_arbol(arbol_todo),
+        'arbol_truper': ordenar_arbol(arbol_truper),
+        'arbol_ecosa': ordenar_arbol(arbol_ecosa),
         'cantidad_catalogos': cantidad_catalogos
     })
-
+    
 @never_cache
 @login_required(login_url='/login/')
 def historial_catalogo(request):
@@ -540,13 +700,13 @@ def descargar_catalogo_version(request, catalogo_id):
         filename=nombre_archivo,
         content_type='application/pdf',
     )
+
 @never_cache
 @login_required(login_url='/login/')
 def eliminar_catalogo(request, catalogo_id):
     if not request.user.is_superuser:
         raise PermissionDenied
 
-    # Usamos filter en lugar de get_object_or_404 para evitar MultipleObjectsReturned
     catalogos = CatalogCache.objects.filter(pk=catalogo_id)
 
     if not catalogos.exists():
@@ -560,7 +720,6 @@ def eliminar_catalogo(request, catalogo_id):
     for catalogo in catalogos:
         version_num = catalogo.version_number
         if catalogo.pdf_file:
-            # Borra el archivo físico del servidor sin guardar el modelo antes de eliminarlo
             catalogo.pdf_file.delete(save=False)
         catalogo.delete()
 
@@ -569,6 +728,7 @@ def eliminar_catalogo(request, catalogo_id):
         f"La versión {version_num or catalogo_id} del catálogo y su archivo PDF fueron eliminados para liberar espacio."
     )
     return redirect('historial_catalogo')
+
 # ==========================================
 # GESTIÓN DE VIGENCIA Y BLOQUEO DE CATÁLOGOS
 # ==========================================
@@ -591,9 +751,199 @@ def marcar_catalogo_vigente(request, catalogo_id):
     messages.success(request, f"Se ha fijado el catálogo Versión {catalogo.version_number} como la versión vigente oficial.")
     return redirect('historial_catalogo')
 
+
+
+import logging
+logger = logging.getLogger(__name__)
+
+def limpiar_pdfs_huerfanos(sin_precio):
+    carpeta = os.path.join(settings.MEDIA_ROOT, 'catalogos')
+    if not os.path.isdir(carpeta):
+        return
+
+    if sin_precio:
+        nombres_validos = {
+            os.path.basename(c.pdf_file.name)
+            for c in CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio')
+        }
+        es_del_tipo = lambda f: 'Sin_Precio' in f
+    else:
+        nombres_validos = {
+            os.path.basename(c.pdf_file.name)
+            for c in CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio')
+        }
+        es_del_tipo = lambda f: f.startswith('Catalogo_Ecosa_') and 'Sin_Precio' not in f
+
+    for nombre_archivo in os.listdir(carpeta):
+        if not nombre_archivo.lower().endswith('.pdf'):
+            continue
+        if not es_del_tipo(nombre_archivo):
+            continue
+        if nombre_archivo not in nombres_validos:
+            ruta_completa = os.path.join(carpeta, nombre_archivo)
+            try:
+                os.remove(ruta_completa)
+                logger.info(f"[limpieza catalogos] Huérfano eliminado: {nombre_archivo}")
+            except OSError as e:
+                logger.warning(f"[limpieza catalogos] No se pudo eliminar {nombre_archivo}: {e}")
+
+
 # ==========================================
-# GENERACIÓN DE PDF
+# VISTA: GESTIÓN Y REASIGNACIÓN DE GRUPOS
 # ==========================================
+
+@never_cache
+@login_required(login_url='/login/')
+@user_passes_test(lambda u: u.is_superuser)
+def gestionar_grupos(request):
+    busqueda = request.GET.get('q', '').strip() or request.POST.get('q', '').strip()
+    page_number = request.GET.get('page') or request.POST.get('page')
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+
+        if accion == 'guardar_individual':
+            p_id = request.POST.get('producto_id_individual')
+            nuevo_grupo = request.POST.get('nuevo_grupo_individual', '').strip()
+            nuevo_subgrupo = request.POST.get('nuevo_subgrupo_individual', '').strip()
+            nuevo_limpio = request.POST.get('nuevo_nombre_limpio_individual', '').strip()
+            orden = request.POST.get('orden_grupo_individual', '0').strip()
+            es_destacado = request.POST.get('es_destacado_individual') == '1'
+            etiqueta = request.POST.get('etiqueta_destacado_individual', 'OFERTA').strip()
+
+            if p_id and nuevo_grupo:
+                subgrupo_val = nuevo_subgrupo if nuevo_subgrupo else nuevo_grupo
+                ProductoGrupoManual.objects.update_or_create(
+                    producto_id=p_id,
+                    defaults={
+                        'grupo_personalizado': nuevo_grupo,
+                        'subgrupo_personalizado': subgrupo_val,
+                        'nombre_limpio_personalizado': nuevo_limpio if nuevo_limpio else None
+                    }
+                )
+                
+                img_obj, _ = ImagenProducto.objects.get_or_create(grupo_nombre=nuevo_grupo)
+                img_obj.orden_grupo = int(orden) if orden.isdigit() else 0
+                img_obj.es_destacado = es_destacado
+                img_obj.etiqueta_destacado = etiqueta if etiqueta else "OFERTA"
+                img_obj.save()
+
+                messages.success(request, f"Producto #{p_id} y grupo '{nuevo_grupo}' actualizados correctamente.")
+
+        elif accion == 'guardar_pagina':
+            ids = request.POST.getlist('producto_id[]')
+            grupos = request.POST.getlist('nuevo_grupo[]')
+            subgrupos = request.POST.getlist('nuevo_subgrupo[]')
+            limpios = request.POST.getlist('nuevo_nombre_limpio[]')
+            ordenes = request.POST.getlist('orden_grupo[]')
+            destacados_checks = request.POST.getlist('es_destacado[]')
+            etiquetas = request.POST.getlist('etiqueta_destacado[]')
+
+            for idx, p_id in enumerate(ids):
+                nuevo_grupo = grupos[idx].strip() if idx < len(grupos) else ""
+                nuevo_subgrupo = subgrupos[idx].strip() if idx < len(subgrupos) else ""
+                nuevo_limpio = limpios[idx].strip() if idx < len(limpios) else ""
+                orden_val = ordenes[idx].strip() if idx < len(ordenes) else "0"
+                etiqueta_val = etiquetas[idx].strip() if idx < len(etiquetas) else "OFERTA"
+                es_dest = str(p_id) in destacados_checks
+
+                if nuevo_grupo:
+                    subgrupo_val = nuevo_subgrupo if nuevo_subgrupo else nuevo_grupo
+                    ProductoGrupoManual.objects.update_or_create(
+                        producto_id=p_id,
+                        defaults={
+                            'grupo_personalizado': nuevo_grupo,
+                            'subgrupo_personalizado': subgrupo_val,
+                            'nombre_limpio_personalizado': nuevo_limpio if nuevo_limpio else None
+                        }
+                    )
+                    img_obj, _ = ImagenProducto.objects.get_or_create(grupo_nombre=nuevo_grupo)
+                    img_obj.orden_grupo = int(orden_val) if orden_val.isdigit() else 0
+                    img_obj.es_destacado = es_dest
+                    img_obj.etiqueta_destacado = etiqueta_val if etiqueta_val else "OFERTA"
+                    img_obj.save()
+
+            messages.success(request, "Se han guardado todos los cambios de la página con éxito.")
+
+        elif accion == 'restaurar_individual':
+            p_id = request.POST.get('producto_id_restaurar')
+            grupo_restaurar = request.POST.get('grupo_restaurar')
+            if p_id:
+                ProductoGrupoManual.objects.filter(producto_id=p_id).delete()
+            if grupo_restaurar:
+                ImagenProducto.objects.filter(grupo_nombre=grupo_restaurar).update(
+                    orden_grupo=0, 
+                    es_destacado=False, 
+                    etiqueta_destacado="OFERTA"
+                )
+            messages.success(request, "Producto restaurado a sus valores automáticos.")
+
+        # Reconstrucción de parámetros para conservar página y búsqueda activa
+        parametros = []
+        if busqueda:
+            parametros.append(f"q={busqueda}")
+        if page_number:
+            parametros.append(f"page={page_number}")
+        
+        query_str = f"?{'&'.join(parametros)}" if parametros else ""
+        return redirect(f"{request.path}{query_str}")
+
+    qs = VistaProductoVariantes.objects.select_related("proveedor").all()
+    if busqueda:
+        qs = qs.filter(
+            Q(codigo__icontains=busqueda) |
+            Q(descripcion__icontains=busqueda) |
+            Q(descripcion_grupo__icontains=busqueda) |
+            Q(proveedor__marca__icontains=busqueda)
+        )
+    qs = qs.order_by("codigo")
+
+    overrides = {item.producto_id: item for item in ProductoGrupoManual.objects.all()}
+    imagenes_meta = {
+        str(img.grupo_nombre).strip().upper(): img 
+        for img in ImagenProducto.objects.all()
+    }
+
+    productos_lista = []
+    for p in qs:
+        override = overrides.get(p.id)
+        grupo_activo = override.grupo_personalizado if override else (p.descripcion_grupo or p.descripcion)
+        subgrupo_activo = override.subgrupo_personalizado if (override and override.subgrupo_personalizado) else grupo_activo
+        nombre_limpio = override.nombre_limpio_personalizado if (override and override.nombre_limpio_personalizado) else p.descripcion
+
+        meta_grupo = imagenes_meta.get(str(grupo_activo).strip().upper())
+
+        p.grupo_activo = grupo_activo
+        p.subgrupo_activo = subgrupo_activo
+        p.grupo_manual = bool(override)
+        p.nombre_limpio = nombre_limpio
+        p.nombre_limpio_es_manual = bool(override and override.nombre_limpio_personalizado)
+        p.orden_grupo = meta_grupo.orden_grupo if meta_grupo else 0
+        p.es_destacado = meta_grupo.es_destacado if meta_grupo else False
+        p.etiqueta_destacado = meta_grupo.etiqueta_destacado if (meta_grupo and meta_grupo.etiqueta_destacado) else "OFERTA"
+
+        productos_lista.append(p)
+
+    todos_los_grupos = sorted(list(set(
+        list(VistaProductoVariantes.objects.values_list('descripcion_grupo', flat=True).distinct()) +
+        list(ProductoGrupoManual.objects.values_list('grupo_personalizado', flat=True).distinct())
+    )))
+
+    paginator = Paginator(productos_lista, 50)
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'gestionar_grupos.html', {
+        'productos': page_obj,
+        'page_obj': page_obj,
+        'busqueda': busqueda,
+        'todos_los_grupos': todos_los_grupos,
+    })
+
+from collections import Counter  # nuevo import, requerido para 'marca_grupo'
+from collections import Counter  # nuevo import, requerido para 'marca_grupo'
+from collections import Counter  # nuevo import, requerido para 'marca_grupo'
+
+
 @never_cache
 @login_required(login_url='/login/')
 @user_passes_test(lambda u: u.is_superuser)
@@ -602,6 +952,8 @@ def generar_pdf(request):
         grupos_seleccionados = request.POST.getlist('grupos_seleccionados')
         tipo_catalogo = request.POST.get('tipo_catalogo', 'con_precio')
         sin_precio = (tipo_catalogo == 'sin_precio')
+        modo_filtro = request.POST.get('modo_filtro', 'completo')
+        es_solo_truper = (modo_filtro == 'solo_truper')
 
         MESES_ES = [
             "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -616,32 +968,76 @@ def generar_pdf(request):
             messages.error(request, "Debes seleccionar al menos un grupo para generar el catálogo.")
             return redirect('menu_exportar')
 
+        overrides_dict = {
+            item.producto_id: item
+            for item in ProductoGrupoManual.objects.all()
+        }
+
+        ids_con_override = [
+            pid for pid, item in overrides_dict.items()
+            if item.grupo_personalizado in grupos_seleccionados
+        ]
+
         qs = VistaProductoVariantes.objects.select_related("proveedor").filter(
-            descripcion_grupo__in=grupos_seleccionados
-        ).annotate(
+            Q(descripcion_grupo__in=grupos_seleccionados) | Q(id__in=ids_con_override)
+        )
+
+        if es_solo_truper:
+            qs = qs.filter(Q(codigo__startswith='17') | Q(codigo__startswith='18'))
+
+        qs = qs.annotate(
             es_truper=Case(
                 When(proveedor__marca__iexact='truper', then=Value(0)),
+                When(codigo__startswith='17', then=Value(0)),
+                When(codigo__startswith='18', then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
             )
         )
 
-        productos = list(qs)
+        productos_raw = list(qs)
         familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
+        FAMILIAS_EXCLUIDAS = {'70', '90', '95', '98', '99'}
 
-        for p in productos:
+        productos = []
+        for p in productos_raw:
+            override_item = overrides_dict.get(p.id)
+            grupo_final = override_item.grupo_personalizado if override_item else (p.descripcion_grupo or p.descripcion)
+            subgrupo_final = override_item.subgrupo_personalizado if (override_item and override_item.subgrupo_personalizado) else grupo_final
+
+            if grupo_final not in grupos_seleccionados:
+                continue
+
+            p.grupo_final = grupo_final
+            p.subgrupo_final = subgrupo_final
             p.familia_temporal = "Sin Familia"
+            p.codigo_familia_num = 9999
+            p.codigo_prod_num = 9999
             if p.codigo and "-" in p.codigo:
                 partes = p.codigo.split("-")
+
+                if len(partes) >= 2 and partes[1] in FAMILIAS_EXCLUIDAS:
+                    continue
+
                 if len(partes) >= 2:
                     p.familia_temporal = familias_dict.get(partes[1], "Sin Familia")
+                    if partes[1].isdigit():
+                        p.codigo_familia_num = int(partes[1])
+                if len(partes) >= 3 and partes[2].isdigit():
+                    p.codigo_prod_num = int(partes[2])
 
-        productos.sort(key=lambda p: (
-            p.es_truper,
-            p.familia_temporal,
-            p.descripcion_grupo or p.descripcion or "",
-            p.codigo
-        ))
+            if override_item and override_item.nombre_limpio_personalizado:
+                p.medida_mostrar = override_item.nombre_limpio_personalizado
+            else:
+                p.medida_mostrar = extraer_medida(p.grupo_final, p.descripcion or "", p.codigo_de_origen or "")
+
+            # Formato de precio chileno: puntos como separador de miles, sin símbolo, termina en ".-"
+            if p.precio_base_pesos:
+                p.precio_clp = f"{int(round(p.precio_base_pesos)):,}".replace(",", ".") + ".-"
+            else:
+                p.precio_clp = None
+
+            productos.append(p)
 
         imagenes_dict = {
             str(img.grupo_nombre).strip().upper(): obtener_base64_imagen(img.imagen.name)
@@ -650,53 +1046,223 @@ def generar_pdf(request):
 
         descripciones_dict = {img.grupo_nombre: img.descripcion for img in ImagenProducto.objects.all() if img.descripcion}
 
-        UMBRAL_VARIANTES_TARJETA_ANCHA = 8
+        destacados_dict = {
+            str(img.grupo_nombre).strip().upper(): {
+                'es_destacado': img.es_destacado,
+                'etiqueta': img.etiqueta_destacado or "DESTACADO"
+            }
+            for img in ImagenProducto.objects.all()
+        }
+
+        ordenes_dict = {
+            str(img.grupo_nombre).strip().upper(): img.orden_grupo
+            for img in ImagenProducto.objects.all()
+        }
+
         catalogo = OrderedDict()
         catalogo["Truper"] = OrderedDict()
-        catalogo["Otras Marcas"] = OrderedDict()
+        if not es_solo_truper:
+            catalogo["Otras Marcas"] = OrderedDict()
+
+        familias_orden_num = {}
 
         for p in productos:
             marca_grupo = "Truper" if p.es_truper == 0 else "Otras Marcas"
             familia = p.familia_temporal
-            grupo = p.descripcion_grupo or p.descripcion
+            grupo = p.grupo_final
+
+            if marca_grupo not in familias_orden_num:
+                familias_orden_num[marca_grupo] = {}
+            if familia not in familias_orden_num[marca_grupo]:
+                familias_orden_num[marca_grupo][familia] = p.codigo_familia_num
+
+            if marca_grupo not in catalogo:
+                catalogo[marca_grupo] = OrderedDict()
 
             familias_de_marca = catalogo[marca_grupo]
             if familia not in familias_de_marca:
                 familias_de_marca[familia] = OrderedDict()
 
             if grupo not in familias_de_marca[familia]:
+                dest_info = destacados_dict.get(str(grupo).strip().upper(), {'es_destacado': False, 'etiqueta': ''})
                 familias_de_marca[familia][grupo] = {
-                    'imagen_url': imagenes_dict.get(grupo, None),
+                    'imagen_url': imagenes_dict.get(str(grupo).strip().upper(), None),
                     'descripcion': descripciones_dict.get(grupo, ""),
+                    'es_destacado': dest_info['es_destacado'],
+                    'etiqueta_destacado': dest_info['etiqueta'],
                     'variantes': []
                 }
-
-            p.medida_mostrar = extraer_medida(grupo, p.descripcion or "", p.codigo_de_origen or "")
 
             if p.es_truper != 0:
                 p.empaque_inner = None
 
             familias_de_marca[familia][grupo]['variantes'].append(p)
 
+        for marca_k, familias_dict_items in list(catalogo.items()):
+            familias_ordenadas = OrderedDict(
+                sorted(
+                    familias_dict_items.items(),
+                    key=lambda item: (familias_orden_num.get(marca_k, {}).get(item[0], 9999), item[0])
+                )
+            )
+            catalogo[marca_k] = familias_ordenadas
+
         catalogo = OrderedDict((k, v) for k, v in catalogo.items() if v)
 
-        for familias_de_marca in catalogo.values():
+        # ==========================================================
+        # ORDENAMIENTO DEFINITIVO:
+        # posición fija (orden_grupo manual) -> tarjetas anchas
+        # (>8 variantes) al final -> agrupadas por prefijo de nombre
+        # (ej. "FLEXIBLE ...") -> orden natural por código
+        # ==========================================================
+        UMBRAL_TARJETA_ANCHA = 8  # más de 8 variantes -> tarjeta ancha, va al final
+        catalogo_paginado = OrderedDict()
+
+        for marca_k, familias_de_marca in catalogo.items():
             for familia, grupos in list(familias_de_marca.items()):
-                for info in grupos.values():
-                    info['es_ancha'] = len(info['variantes']) > UMBRAL_VARIANTES_TARJETA_ANCHA
+
+                # --- PASO 1: Métricas por grupo ---
+                for nombre_g, info in grupos.items():
                     info['tiene_empaque_inner'] = any(
                         v.empaque_inner for v in info['variantes']
                     )
 
+                    # Orden interno de la tabla manteniendo subgrupos juntos y por código
+                    info['variantes'].sort(key=lambda v: (str(v.subgrupo_final), v.codigo_prod_num, v.codigo))
+
+                    subgrupos_unicos = set(
+                        v.subgrupo_final for v in info['variantes']
+                        if v.subgrupo_final and v.subgrupo_final != nombre_g
+                    )
+                    info['tiene_subgrupos'] = len(subgrupos_unicos) > 0
+
+                    min_codigo_prod = info['variantes'][0].codigo_prod_num if info['variantes'] else 9999
+                    min_codigo_str = info['variantes'][0].codigo if info['variantes'] else ""
+                    info['min_codigo_prod'] = min_codigo_prod
+                    info['min_codigo_str'] = min_codigo_str
+
+                    pos_db = ordenes_dict.get(str(nombre_g).strip().upper(), 0)
+                    info['posicion_fija'] = pos_db if pos_db > 0 else 9999
+
+                    # Altura real de la tarjeta: variantes + cabeceras de subgrupo
+                    info['filas_cabecera_subgrupos'] = len(subgrupos_unicos)
+                    info['filas_totales'] = len(info['variantes']) + len(subgrupos_unicos)
+
+                    # --- Tarjeta ancha: muchas variantes -> 2 columnas y al final ---
+                    info['es_ancha'] = len(info['variantes']) > UMBRAL_TARJETA_ANCHA
+
+                    # --- Prefijo de agrupación por nombre (flexible junto a flexible) ---
+                    info['prefijo_nombre'] = str(nombre_g).strip().split(' ')[0].upper() if nombre_g else ""
+
+                    # --- Marca (proveedor) representativa del grupo, para el badge ---
+                    marcas_grupo = [
+                        v.proveedor.marca for v in info['variantes']
+                        if getattr(v, 'proveedor', None) and v.proveedor.marca
+                    ]
+                    info['marca_grupo'] = Counter(marcas_grupo).most_common(1)[0][0] if marcas_grupo else ""
+
+                # --- PASO 2: Orden definitivo ---
+                # Posición fija -> escalera por cantidad EXACTA de variantes (1, luego 2,
+                # luego 3...) -> dentro de cada escalón, agrupadas por nombre -> código
                 familias_de_marca[familia] = OrderedDict(
-                    sorted(grupos.items(), key=lambda item: (item[1]['es_ancha'], item[0]))
+                    sorted(grupos.items(), key=lambda item: (
+                        item[1]['posicion_fija'],
+                        len(item[1]['variantes']),
+                        item[1]['prefijo_nombre'],
+                        item[1]['min_codigo_prod'],
+                        item[1]['min_codigo_str']
+                    ))
                 )
+
+                # --- PASO 3: Empaquetado en filas (3 unidades c/u), páginas (máx. 3 filas
+                # = 9 unidades) y máximo 2 tarjetas anchas por página ---
+                # Una tarjeta normal cuesta 1 unidad, una ancha cuesta 2. Empaquetamos por
+                # espacio real (no por cantidad de tarjetas) para que nunca quede una
+                # columna vacía cuando una ancha no cabe en lo que resta de la fila.
+                SLOTS_POR_FILA = 3
+                FILAS_POR_PAGINA = 3
+                MAX_ANCHAS_POR_PAGINA = 2
+                UMBRAL_PAGINA_COMPLETA = 6  # unidades usadas a partir de las cuales se estira para llenar la hoja
+
+                # 3a. Empaquetar en filas por espacio real (igual que antes)
+                filas_paginado = []
+                fila_actual = []
+                slots_usados = 0
+
+                for nombre_g, info in familias_de_marca[familia].items():
+                    costo = 2 if info['es_ancha'] else 1
+                    if slots_usados + costo > SLOTS_POR_FILA and fila_actual:
+                        filas_paginado.append(fila_actual)
+                        fila_actual = []
+                        slots_usados = 0
+                    fila_actual.append((nombre_g, info))
+                    slots_usados += costo
+
+                if fila_actual:
+                    filas_paginado.append(fila_actual)
+
+                # 3b. Agrupar filas en páginas: máximo 3 filas Y máximo 2 anchas por página.
+                # Cada fila cabe como mucho 1 ancha (2+2=4 unidades no entra en 3), así que
+                # basta con revisar si la fila trae una ancha o no.
+                paginas_familia = []
+                pagina_actual = []
+                anchas_en_pagina = 0
+
+                for fila in filas_paginado:
+                    trae_ancha = any(info['es_ancha'] for _, info in fila)
+
+                    necesita_pagina_nueva = (
+                        len(pagina_actual) >= FILAS_POR_PAGINA
+                        or (anchas_en_pagina + (1 if trae_ancha else 0)) > MAX_ANCHAS_POR_PAGINA
+                    )
+
+                    if necesita_pagina_nueva and pagina_actual:
+                        paginas_familia.append(pagina_actual)
+                        pagina_actual = []
+                        anchas_en_pagina = 0
+
+                    pagina_actual.append(fila)
+                    if trae_ancha:
+                        anchas_en_pagina += 1
+
+                if pagina_actual:
+                    paginas_familia.append(pagina_actual)
+
+                # 3c. Marcar cada página como "completa" (se estira para llenar la hoja)
+                # o "cola" (pocos productos sueltos, alto natural, sin forzar nada).
+                # A cada fila se le calcula un "peso" proporcional a su contenido real
+                # (la tarjeta más alta de esa fila, medida en filas_totales) para que,
+                # al estirar la página, una fila con tablas cortas no reciba el mismo
+                # espacio que una fila con tablas largas.
+                paginas_con_info = []
+                for pagina in paginas_familia:
+                    unidades_pagina = sum(
+                        (2 if info['es_ancha'] else 1)
+                        for fila in pagina for _, info in fila
+                    )
+
+                    filas_con_peso = []
+                    BASE_FIJA_TARJETA = 9  # representa encabezado + imagen, presentes siempre
+                    for fila in pagina:
+                        peso_fila = max((info['filas_totales'] for _, info in fila), default=1)
+                        filas_con_peso.append({
+                            'items': fila,
+                            'peso': BASE_FIJA_TARJETA + peso_fila,
+                        })
+
+                    paginas_con_info.append({
+                        'filas': filas_con_peso,
+                        'completa': unidades_pagina >= UMBRAL_PAGINA_COMPLETA,
+                    })
+
+                catalogo_paginado.setdefault(marca_k, OrderedDict())[familia] = paginas_con_info
 
         logo_base64 = obtener_base64_imagen('static/img/logo_ecosa.png')
         portada_base64 = obtener_base64_imagen('static/img/portada.png')
 
         html_productos = render_to_string('catalogo_pdf.html', {
             'catalogo': catalogo,
+            'catalogo_paginado': catalogo_paginado,
             'request': request,
             'logo_base64': logo_base64,
             'portada_base64': portada_base64,
@@ -711,7 +1277,7 @@ def generar_pdf(request):
                 font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
                 font-size: 8pt;
                 width: 100%;
-                padding: 0 10mm;
+                padding: 2mm 10mm 0 10mm;
                 display: flex;
                 align-items: center;
                 justify-content: flex-start;
@@ -719,7 +1285,7 @@ def generar_pdf(request):
             }}
         </style>
         <div class="header-box">
-            {"<img src='" + logo_base64 + "' style='height: 12mm; width: auto;' />" if logo_base64 else ""}
+            {"<img src='" + logo_base64 + "' style='height: 7mm; width: auto;' />" if logo_base64 else ""}
         </div>
         """
 
@@ -777,7 +1343,7 @@ def generar_pdf(request):
                         display_header_footer=True,
                         header_template=header_template,
                         footer_template=footer_template,
-                        margin={"top": "28mm", "bottom": "18mm", "left": "10mm", "right": "10mm"}
+                        margin={"top": "18mm", "bottom": "18mm", "left": "10mm", "right": "10mm"}
                     )
                     page_productos.close()
 
@@ -917,17 +1483,17 @@ def generar_pdf(request):
                 os.remove(tmp_html_productos_path)
 
         fecha_archivo = datetime.now().strftime('%d-%m-%Y')
+        prefijo_nombre = "Catalogo_Truper" if es_solo_truper else "Catalogo_Ecosa"
 
         if sin_precio:
-            nombre_archivo = f"Catalogo_Ecosa_Sin_Precio_{fecha_archivo}.pdf"
+            nombre_archivo = f"{prefijo_nombre}_Sin_Precio_{fecha_archivo}.pdf"
             catalogos_existentes = CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio').order_by('version_number')
-            texto_tipo = "sin precio"
+            texto_tipo = "sin precio (Solo Truper)" if es_solo_truper else "sin precio"
         else:
-            nombre_archivo = f"Catalogo_Ecosa_{fecha_archivo}.pdf"
+            nombre_archivo = f"{prefijo_nombre}_{fecha_archivo}.pdf"
             catalogos_existentes = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').order_by('version_number')
-            texto_tipo = "con precio"
+            texto_tipo = "con precio (Solo Truper)" if es_solo_truper else "con precio"
 
-        # --- BORRADO DEL MÁS ANTIGUO (mantiene máximo 3 por tipo) ---
         if catalogos_existentes.count() >= 3:
             catalogo_mas_antiguo = catalogos_existentes.first()
             if catalogo_mas_antiguo.pdf_file:
@@ -938,7 +1504,6 @@ def generar_pdf(request):
             catalogo_mas_antiguo.delete()
             messages.warning(request, f"Se ha eliminado el catálogo {texto_tipo} más antiguo para liberar espacio.")
 
-        # --- RED DE SEGURIDAD: limpia huérfanos que no coincidan con la BD ---
         limpiar_pdfs_huerfanos(sin_precio)
 
         ultima_version = CatalogCache.objects.order_by('-version_number').first()
@@ -955,44 +1520,29 @@ def generar_pdf(request):
 
     return redirect('dashboard')
 
-import logging
-logger = logging.getLogger(__name__)
+def sugerencias_busqueda(request):
+    termino = request.GET.get('term', '').strip()
+    resultados = []
+    
+    if len(termino) >= 2:
+        qs = VistaProductoVariantes.objects.filter(
+            Q(codigo__icontains=termino) |
+            Q(codigo_de_origen__icontains=termino) |
+            Q(descripcion__icontains=termino) |
+            Q(descripcion_grupo__icontains=termino)
+        ).values('codigo', 'descripcion', 'descripcion_grupo')[:7]
 
-def limpiar_pdfs_huerfanos(sin_precio):
-    """
-    Red de seguridad: recorre media/catalogos/ y elimina físicamente
-    cualquier PDF del tipo indicado que ya no tenga un registro
-    correspondiente en CatalogCache (huérfanos históricos o fallos de borrado).
-    """
-    carpeta = os.path.join(settings.MEDIA_ROOT, 'catalogos')
-    if not os.path.isdir(carpeta):
-        return
-
-    if sin_precio:
-        nombres_validos = {
-            os.path.basename(c.pdf_file.name)
-            for c in CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio')
-        }
-        es_del_tipo = lambda f: 'Sin_Precio' in f
-    else:
-        nombres_validos = {
-            os.path.basename(c.pdf_file.name)
-            for c in CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio')
-        }
-        es_del_tipo = lambda f: f.startswith('Catalogo_Ecosa_') and 'Sin_Precio' not in f
-
-    for nombre_archivo in os.listdir(carpeta):
-        if not nombre_archivo.lower().endswith('.pdf'):
-            continue
-        if not es_del_tipo(nombre_archivo):
-            continue
-        if nombre_archivo not in nombres_validos:
-            ruta_completa = os.path.join(carpeta, nombre_archivo)
-            try:
-                os.remove(ruta_completa)
-                logger.info(f"[limpieza catalogos] Huérfano eliminado: {nombre_archivo}")
-            except OSError as e:
-                logger.warning(f"[limpieza catalogos] No se pudo eliminar {nombre_archivo}: {e}")
-
-
-
+        vistos = set()
+        for p in qs:
+            nombre_grupo = p['descripcion_grupo'] or p['descripcion']
+            # Mostramos el código buscado junto con el nombre del grupo
+            etiqueta = f"{p['codigo']} - {nombre_grupo}"
+            if etiqueta not in vistos:
+                vistos.add(etiqueta)
+                resultados.append({
+                    'label': etiqueta,
+                    'valor': p['codigo'],  
+                    'codigo': p['codigo']
+                })
+            
+    return JsonResponse(resultados, safe=False)

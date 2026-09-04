@@ -1,4 +1,5 @@
 {% load static %}
+{% load catalogo_extras %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,6 +12,55 @@
     <link rel="stylesheet" href="{% static 'css/productos.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    <style>
+        .form-busqueda {
+            position: relative;
+        }
+        .sugerencias-desplegable {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            margin-top: 4px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .sug-item {
+            padding: 9px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+            text-align: left;
+            transition: background 0.15s ease;
+        }
+        .sug-item:last-child {
+            border-bottom: none;
+        }
+        .sug-item:hover {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-weight: 600;
+        }
+        /* Nombre de usuario en el topbar */
+        .usuario-actual {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #334155;
+            margin-right: 8px;
+        }
+        .usuario-actual i {
+            font-size: 1rem;
+        }
+    </style>
 </head>
 <body>
 
@@ -22,6 +72,9 @@
         
         <div class="topbar-actions">
             {% if user.is_authenticated %}
+                <span class="usuario-actual">
+                    <i class="bi bi-person-circle"></i> {{ user.username }}
+                </span>
                 <a href="{% url 'dashboard' %}" class="btn-dashboard">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
@@ -61,15 +114,23 @@
 
             <div class="bloque-filtro">
                 <h2>Buscar</h2>
-                <form class="form-busqueda" method="get" action="">
+                <form class="form-busqueda" method="get" action="" id="formBusqueda">
                     {% if familia_actual %}
                         <input type="hidden" name="familia" value="{{ familia_actual }}">
                     {% endif %}
                     {% if marca_actual %}
                         <input type="hidden" name="marca" value="{{ marca_actual }}">
                     {% endif %}
-                    <input type="text" name="q" placeholder="Nombre, código o marca..." value="{{ busqueda }}">
+                    <input 
+                        type="text" 
+                        name="q" 
+                        id="inputBusqueda"
+                        placeholder="Nombre, código o marca..." 
+                        value="{{ busqueda }}"
+                        autocomplete="off"
+                    >
                     <button type="submit">Buscar</button>
+                    <div id="sugerencias-box" class="sugerencias-desplegable" style="display: none;"></div>
                 </form>
             </div>
 
@@ -152,9 +213,15 @@
             {% if grupos %}
                 <div class="grid-productos">
                     {% for grupo in grupos %}
-                        <article class="tarjeta">
+                        <article class="tarjeta {% if grupo.es_destacado %}tarjeta-destacada{% endif %}">
 
                             <div class="imagen-wrap">
+                                {% if grupo.es_destacado %}
+                                    <span class="badge-destacado-web">
+                                        <i class="bi bi-star-fill"></i> {{ grupo.etiqueta_destacado|default:"OFERTA" }}
+                                    </span>
+                                {% endif %}
+
                                 {% if grupo.imagen_url %}
                                     <img src="{{ grupo.imagen_url }}" alt="{{ grupo.nombre }}">
                                 {% else %}
@@ -201,12 +268,14 @@
                                 <div class="footer-tarjeta">
                                     <div class="precio">
                                         {% if user.is_authenticated %}
-                                            {% if grupo.precio_desde %}
-                                                <span class="desde">Desde</span>
-                                                ${{ grupo.precio_desde|floatformat:0 }}
-                                            {% else %}
-                                                Consultar precio
-                                            {% endif %}
+                                            {% with precio_formateado=grupo.precio_desde|formato_clp %}
+                                                {% if precio_formateado %}
+                                                    <span class="desde">Desde</span>
+                                                    {{ precio_formateado }}
+                                                {% else %}
+                                                    Consultar precio
+                                                {% endif %}
+                                            {% endwith %}
                                         {% else %}
                                             <span class="desde">Precio</span>
                                             <a href="{% url 'login' %}" style="font-size: 0.8rem; color: var(--color-primario); text-decoration: underline; font-weight: 600;">
@@ -287,6 +356,59 @@
         if (btnFiltros) btnFiltros.addEventListener('click', abrirFiltros);
         if (overlay) overlay.addEventListener('click', cerrarFiltros);
         if (cerrar) cerrar.addEventListener('click', cerrarFiltros);
+
+        const input = document.getElementById('inputBusqueda');
+        const box = document.getElementById('sugerencias-box');
+        const form = document.getElementById('formBusqueda');
+        let timer = null;
+
+        if (input && box && form) {
+            input.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(timer);
+
+                if (query.length < 2) {
+                    box.style.display = 'none';
+                    box.innerHTML = '';
+                    return;
+                }
+
+                timer = setTimeout(() => {
+                    fetch(`/api/sugerencias/?term=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (!data || data.length === 0) {
+                                box.style.display = 'none';
+                                box.innerHTML = '';
+                                return;
+                            }
+
+                            box.innerHTML = '';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'sug-item';
+                                div.textContent = item.label;
+                                div.addEventListener('click', () => {
+                                    input.value = item.valor;
+                                    box.style.display = 'none';
+                                    form.submit();
+                                });
+                                box.appendChild(div);
+                            });
+                            box.style.display = 'block';
+                        })
+                        .catch(() => {
+                            box.style.display = 'none';
+                        });
+                }, 250);
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!form.contains(e.target)) {
+                    box.style.display = 'none';
+                }
+            });
+        }
     })();
     </script>
 

@@ -13,3 +13,5 @@ services:
     # CRÍTICO: Le dice a Docker que lea tus variables de entorno
     env_file:
       - .env
+
+    restart: always

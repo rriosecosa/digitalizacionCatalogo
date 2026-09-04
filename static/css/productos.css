@@ -330,7 +330,7 @@ main.contenido {
 
 .tarjeta .imagen-wrap {
   height: 180px;
-  background: #ffffff; /* Cambio a blanco puro para matchear con imágenes */
+  background: #ffffff;
   border-bottom: 1px solid var(--color-borde);
   display: flex;
   align-items: center;
@@ -342,7 +342,6 @@ main.contenido {
   padding: 8px;
 }
 
-/* ESTILO ADICIONAL PARA LA IMAGEN REAL SUBIDA */
 .tarjeta .imagen-wrap img {
   width: 100%;
   height: 100%;
@@ -430,7 +429,6 @@ main.contenido {
   color: var(--color-texto-suave);
 }
 
-/* ENLACE VER VARIANTES */
 .btn-ver-detalle {
   display: block;
   text-align: center;
@@ -464,8 +462,6 @@ main.contenido {
   border-color: var(--color-primario);
 }
 
-/* ---------- Vacío ---------- */
-
 .estado-vacio {
   background: #fff;
   border: 1px dashed var(--color-borde);
@@ -479,8 +475,6 @@ main.contenido {
   margin: 0 0 6px;
   color: var(--color-texto);
 }
-
-/* ---------- Paginación ---------- */
 
 nav.paginacion {
   display: flex;
@@ -525,7 +519,6 @@ nav.paginacion span.puntos {
   color: var(--color-texto-suave);
 }
 
-/* --- Estilos del Header / Topbar --- */
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -553,7 +546,6 @@ nav.paginacion span.puntos {
   align-items: center;
 }
 
-/* --- Botones de la Topbar --- */
 .btn-login,
 .btn-dashboard,
 .btn-logout {
@@ -567,7 +559,6 @@ nav.paginacion span.puntos {
   transition: all 0.2s ease;
 }
 
-/* Iniciar Sesión (Fondo Blanco y Letras Verdes) */
 .btn-login {
   background: #ffffff;
   color: var(--color-primario);
@@ -583,7 +574,6 @@ nav.paginacion span.puntos {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
-/* Dashboard */
 .btn-dashboard {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
@@ -596,7 +586,6 @@ nav.paginacion span.puntos {
   transform: translateY(-2px);
 }
 
-/* Cerrar Sesión */
 .btn-logout {
   background: transparent;
   color: #fff;
@@ -607,8 +596,6 @@ nav.paginacion span.puntos {
 .btn-logout:hover {
   background: rgba(255, 255, 255, 0.15);
 }
-
-/* ---------- Filtros en móvil (panel off-canvas) ---------- */
 
 .barra-movil-filtros {
   display: none;
@@ -738,4 +725,89 @@ nav.paginacion span.puntos {
   ul.lista-opciones {
     max-height: none;
   }
+}
+
+/* ---------- Productos Destacados (Amarillo / Dorado) ---------- */
+.tarjeta.tarjeta-destacada {
+  border: 2px solid #f59e0b;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.18);
+  position: relative;
+}
+
+.tarjeta.tarjeta-destacada:hover {
+  border-color: #d97706;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28);
+}
+
+.badge-destacado-web {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.badge-destacado-web i {
+  font-size: 0.68rem;
+}
+
+/* ---------- Usuario actual (topbar) ---------- */
+.usuario-actual {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 16px 5px 6px;
+  background: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-primario-oscuro);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.usuario-actual:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.usuario-actual .avatar-usuario {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primario);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.usuario-actual .nombre-usuario {
+  line-height: 1.15;
+  color: var(--color-primario-oscuro);
+}
+
+.usuario-actual .rol-usuario {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--color-texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }

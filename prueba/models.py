@@ -61,15 +61,11 @@ class FamiliaProducto(models.Model):
         db_table = "familia_de_productos"
 
 
-# =====================================================================
-# VISTA SQL (Se acelera automáticamente con los índices de 'producto' y 'proveedor')
-# =====================================================================
 class VistaProductoAgrupado(models.Model):
     id = models.IntegerField(primary_key=True) 
     codigo = models.TextField(blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True)
     precio_base_pesos = models.FloatField(blank=True, null=True)
-    # stock_disponible = models.FloatField(blank=True, null=True)
     codigo_de_origen = models.CharField(max_length=255, null=True, blank=True)
     eliminado = models.FloatField(blank=True, null=True)
     familia_nombre = models.CharField(max_length=255, null=True, blank=True)
@@ -78,6 +74,7 @@ class VistaProductoAgrupado(models.Model):
     empaque_master = models.CharField(max_length=100, null=True, blank=True)
     cantidad_variantes = models.IntegerField(null=True, blank=True)
     empaque_pallet = models.CharField(max_length=100, null=True, blank=True)
+    precio_desde = models.FloatField(blank=True, null=True)
 
     proveedor = models.ForeignKey(
         "Proveedor",
@@ -104,9 +101,6 @@ class VistaProductoAgrupado(models.Model):
         db_table = "vista_producto_agrupado"
 
 
-# =====================================================================
-# NUEVA VISTA SQL PARA EXTRAER TODAS LAS VARIANTES SIN COMPRIMIR
-# =====================================================================
 class VistaProductoVariantes(models.Model):
     id = models.IntegerField(primary_key=True) 
     codigo = models.TextField(blank=True, null=True)
@@ -147,17 +141,17 @@ class VistaProductoVariantes(models.Model):
         db_table = "vista_producto_variantes"
 
 
-# =====================================================================
-# MODELOS ADMINISTRADOS POR DJANGO
-# =====================================================================
 class ImagenProducto(models.Model):
     grupo_nombre = models.CharField(max_length=255, unique=True, db_index=True)
     imagen = models.ImageField(upload_to='productos/')
     descripcion = models.TextField(blank=True, null=True)
+    orden_grupo = models.IntegerField(default=0, db_index=True)
+    es_destacado = models.BooleanField(default=False, verbose_name="¿Es Destacado / Oferta?")
+    etiqueta_destacado = models.CharField(max_length=50, blank=True, null=True, default="OFERTA")
     creado_el = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Datos para {self.grupo_nombre}"
+        return f"Datos para {self.grupo_nombre} (Posición: {self.orden_grupo})"
 
 
 class CatalogCache(models.Model):
@@ -174,6 +168,7 @@ class CatalogCache(models.Model):
     def __str__(self):
         return f"Catálogo v{self.version_number} - {'Actual' if self.is_current else 'Anterior'}"
     
+
 class HistorialCatalogo(models.Model):
     nombre = models.CharField(max_length=200, verbose_name="Nombre del Catálogo")
     archivo_pdf = models.FileField(upload_to='catalogos_pdf/', verbose_name="Archivo PDF")
@@ -191,3 +186,18 @@ class HistorialCatalogo(models.Model):
         if self.archivo_pdf and os.path.isfile(self.archivo_pdf.path):
             os.remove(self.archivo_pdf.path)
         super().delete(*args, **kwargs)
+
+
+class ProductoGrupoManual(models.Model):
+    producto_id = models.IntegerField(unique=True, db_index=True)
+    grupo_personalizado = models.CharField(max_length=255)
+    subgrupo_personalizado = models.CharField(max_length=255, null=True, blank=True)
+    nombre_limpio_personalizado = models.CharField(max_length=255, null=True, blank=True)
+    actualizado_el = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Grupo Manual de Producto"
+        verbose_name_plural = "Grupos Manuales de Productos"
+
+    def __str__(self):
+        return f"Prod #{self.producto_id} -> {self.grupo_personalizado} ({self.subgrupo_personalizado or 'Sin Subgrupo'})"

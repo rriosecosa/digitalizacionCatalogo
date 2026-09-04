@@ -5,279 +5,140 @@
 <head>
     <meta charset="UTF-8">
     <title>Catálogo Oficial Ecosa 2026</title>
-    
     <base href="{{ request.scheme }}://{{ request.get_host }}/">
-    
     <style>
-        /* =========================================================
-           1. ESTILOS DE PÁGINA SEGÚN LA PASADA
-           ========================================================= */
         {% if seccion == 'inicio' %}
-        /* PASO 1: Portada e Índice -> Margen 0 total */
-        @page {
-            size: letter portrait;
-            margin: 0 !important;
-        }
+        @page { size: letter portrait; margin: 0 !important; }
         {% else %}
-        /* PASO 2: Productos -> Separación de 28mm para el Logo ECOSA */
         @page {
             size: letter portrait;
-            margin-top: 28mm;
-            margin-bottom: 18mm;
+            margin-top: 15mm;
+            margin-bottom: 12mm;
             margin-left: 10mm;
             margin-right: 10mm;
         }
         {% endif %}
 
-        * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            box-sizing: border-box;
-        }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; background: #ffffff; }
 
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #1e293b;
-            margin: 0;
-            padding: 0;
-            background: #ffffff;
-        }
+        .portada-container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; page-break-after: always; background-color: #ffffff; }
+        .portada-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* PORTADA */
-        .portada-container {
-            width: 100vw;
-            height: 100vh;
+        .indice-container { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 15mm 20mm; page-break-after: always; background-color: #ffffff; width: 100vw; min-height: 100vh; }
+        .indice-titulo { font-size: 20pt; font-weight: bold; color: #1c960c; margin-bottom: 20px; text-align: center; text-transform: uppercase; }
+        .indice-columnas { column-count: 2; column-gap: 32px; }
+        .indice-marca { font-size: 12.5pt; font-weight: bold; color: #0f172a; margin-top: 10px; margin-bottom: 6px; background-color: #eaf3e0; padding: 3px 7px; border-radius: 4px; border-left: 4px solid #1c960c; break-after: avoid; }
+        .indice-lista { list-style: none; padding: 0; margin: 0; font-size: 8.5pt; }
+        .indice-lista li { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px dashed #d3e5c2; break-inside: avoid; }
+        .indice-familia-nombre { background: #fff; padding-right: 5px; color: #475569; font-weight: bold; }
+        .indice-puntos { flex-grow: 1; border-bottom: 1px dotted #b3d189; margin: 0 5px; }
+        .indice-pagina { background: #fff; padding-left: 5px; font-weight: bold; color: #1c960c; }
+
+        .seccion-familia { margin-bottom: 0; clear: both; page-break-before: always; break-before: page; }
+        .seccion-familia.primera-familia { page-break-before: avoid; break-before: avoid; }
+        .titulo-familia { font-size: 13.5pt; font-weight: bold; color: #ffffff; background-color: #1c960c; padding: 5px 10px; margin-bottom: 8px; border-radius: 4px; break-after: avoid; display: flex; align-items: center; position: relative; }
+        .etiqueta-rastreo { position: absolute; left: 10px; color: #1c960c; font-size: 8pt; z-index: 0; }
+        .texto-titulo { position: relative; z-index: 1; }
+
+        /* Estructura de página: las filas se empaquetan por espacio real en Python
+           (ver PASO 3 en generar_pdf.py), así que nunca quedan huecos horizontales.
+           SIN overflow:hidden a propósito: si una página excede el alto calculado,
+           el contenido se corre a una página física extra en vez de recortarse. */
+        .pagina-productos {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            page-break-after: always;
-            background-color: #ffffff;
-        }
-        .portada-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        /* ÍNDICE */
-        .indice-container {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            padding: 15mm 20mm;
-            page-break-after: always;
-            background-color: #ffffff;
-            width: 100vw;
-            min-height: 100vh;
+        /* Solo las páginas con suficiente contenido (>= UMBRAL_PAGINA_COMPLETA
+           unidades) se estiran para llenar la hoja completa. Las páginas "cola"
+           (pocos productos sueltos al final de una familia) quedan con su alto
+           natural, para no verse absurdamente estiradas. */
+        .pagina-productos.pagina-completa {
+            height: 238mm;
         }
-        .indice-titulo {
-            font-family: inherit;
-            font-size: 20pt;
-            font-weight: bold;
-            color: #1c960c;
-            margin-bottom: 20px;
-            text-align: center;
-            text-transform: uppercase;
-        }
-        .indice-columnas {
-            column-count: 2;
-            column-gap: 32px;
-        }
-        .indice-marca {
-            font-family: inherit;
-            font-size: 12pt;
-            font-weight: bold;
-            color: #0f172a;
-            margin-top: 10px;
-            margin-bottom: 6px;
-            background-color: #eaf3e0;
-            padding: 3px 7px;
-            border-radius: 4px;
-            border-left: 4px solid #1c960c;
-            border-bottom: none;
-            break-after: avoid;
-        }
-        .indice-lista {
-            font-family: inherit;
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            font-size: 8pt;
-        }
-        .indice-lista li {
+
+        .fila-productos {
             display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 3px;
-            padding-bottom: 2px;
-            border-bottom: 1px dashed #d3e5c2;
+            gap: 6px;
+            page-break-inside: avoid;
             break-inside: avoid;
         }
-        .indice-familia-nombre {
-            background: #fff;
-            padding-right: 5px;
-            color: #475569;
-            font-weight: bold;
-        }
-        .indice-puntos {
-            flex-grow: 1;
-            border-bottom: 1px dotted #b3d189;
-            margin: 0 5px;
-        }
-        .indice-pagina {
-            background: #fff;
-            padding-left: 5px;
-            font-weight: bold;
-            color: #1c960c;
-        }
 
-        /* SECCIONES Y FAMILIAS (Contenido de Productos) */
-        .seccion-familia {
-            margin-bottom: 25px;
-            clear: both;
-        }
-        
-        .titulo-familia {
-            font-size: 16pt;
-            font-weight: bold;
-            color: #ffffff;
-            background-color: #1c960c;
-            padding: 8px 12px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            break-after: avoid;
-            display: flex;
-            align-items: center;
-            position: relative;
-        }
-
-        .etiqueta-rastreo {
-            position: absolute;
-            left: 12px;
-            color: #1c960c;
-            font-size: 10pt;
-            z-index: 0;
-        }
-        .texto-titulo {
-            position: relative;
-            z-index: 1;
-        }
-        
-        .productos-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: flex-start;
-        }
-
-        /* TARJETA DE PRODUCTO */
         .grupo-tarjeta {
-            width: calc(33.333% - 6px);
+            position: relative;
             border: none;
-            padding: 6px 5px;
+            padding: 3px 4px;
             background: #fff;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin-bottom: 6px;
-            min-height: 75mm;
             display: flex;
             flex-direction: column;
+            box-sizing: border-box;
+            flex: 1 1 0;
+            min-width: 0;
         }
-        
-        .grupo-tarjeta-ancha {
-            width: 100%;
-            border: none;
-            padding: 8px 6px;
-            background: #fff;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
+
+        /* Tarjeta ancha: el doble de flex-grow que una normal -> ocupa 2/3 de su fila */
+        .grupo-tarjeta.tarjeta-ancha {
+            flex: 2 1 0;
         }
-        .ancho-header-container {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .ancho-header-info {
-            flex: 1;
-            padding-right: 15px;
-        }
-        
-        .grupo-header {
-            text-align: center;
-            margin-bottom: 4px;
-            min-height: 30px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .grupo-titulo {
-            font-size: 9pt;
-            font-weight: bold;
-            color: #0f172a;
-            margin: 0 0 1px 0;
+
+        .grupo-header { text-align: center; margin-bottom: 2px; min-height: 26px; display: flex; flex-direction: column; justify-content: center; flex-shrink: 0; }
+        .grupo-titulo { font-size: 8.8pt; font-weight: bold; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.1px; line-height: 1.15; }
+        .grupo-desc { font-size: 6.8pt; color: #475569; margin: 0; font-style: italic; }
+
+        /* Bloque de imagen: SIEMPRE el mismo tamaño (no crece ni se achica según la
+           página). La foto se ajusta adentro con object-fit: contain -> el marco
+           nunca cambia, solo la imagen se reduce si no cabe. */
+        .grupo-imagen-container { height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; overflow: hidden; }
+        .grupo-imagen-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
+
+        /* Badge de marca (proveedor): línea propia arriba del título, ya no se superpone */
+        .marca-badge-pdf {
+            display: block;
+            font-size: 6pt;
+            font-weight: 700;
+            color: #64748b;
+            background: #f1f5f9;
+            padding: 1px 5px;
+            border-radius: 3px;
             text-transform: uppercase;
-            letter-spacing: 0.2px;
+            letter-spacing: 0.3px;
+            margin: 0 auto 2px auto;
+            width: fit-content;
         }
-        .grupo-desc {
-            font-size: 6.8pt;
-            color: #000000;
-            margin: 0;
-            font-style: italic;
-        }
-        
-        .grupo-imagen-container {
-            height: 150px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 6px;
-        }
-        .grupo-imagen-container img {
-            max-height: 100%;
-            max-width: 100%;
-            object-fit: contain;
-        }
-        
-        table {
-            width: 100%;
-            border-spacing: 0;
-            border-collapse: collapse;
-            font-size: 7.2pt; 
-            table-layout: fixed;
-        }
-        th, td {
-            padding: 3px 1px;
-            text-align: left;
-        }
-        th {
-            background-color: transparent;
-            font-weight: bold;
-            color: #1c960c;
-            text-transform: uppercase;
-            letter-spacing: 0; 
-            font-size: 6.5pt; 
-            border-bottom: 1.5px solid #1c960c;
-        }
-        td {
-            border-bottom: 1px solid #eaf3e0;
-            color: #334155;
-        }
-        .col-codigo-real, .col-ref, .col-medida, .col-inner, .col-precio {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .col-codigo-real { width: 29%; }
-        .col-ref { width: 16%; }
-        .col-medida { width: 22%; white-space: normal; }
-        .col-inner { width: 13%; } 
+
+        table { width: 100%; border-spacing: 0; border-collapse: collapse; font-size: 7.4pt; table-layout: fixed; }
+        th, td { padding: 2px 1px; text-align: left; line-height: 1.15; }
+        th { background-color: transparent; font-weight: bold; color: #1c960c; text-transform: uppercase; font-size: 6.8pt; border-bottom: 1.2px solid #1c960c; }
+        td { border-bottom: 1px solid #f1f5f9; color: #334155; }
+        .col-codigo-real, .col-medida, .col-inner, .col-precio { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .col-ref { overflow: hidden; white-space: normal; word-break: break-word; }
+
+        .col-codigo-real { width: 27%; }
+        .col-ref { width: 20%; }
+        .col-medida { width: 21%; white-space: normal; text-align: center; }
+        .col-inner { width: 12%; text-align: center; }
         .col-precio { width: 20%; text-align: right; }
 
         td.col-codigo-real { font-weight: 700; color: #0f172a; }
         td.col-ref { color: #64748b; }
         td.col-precio { font-weight: bold; color: #1c960c; }
+
+        /* Estilo visual de la fila de Subgrupo */
+        .fila-subgrupo-header td {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-weight: 800;
+            font-size: 7pt;
+            padding: 3px 2px;
+            border-top: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            text-transform: uppercase;
+        }
+
+        .tarjeta-destacada-pdf { background-color: #fffbeb !important; border: 1px solid #f59e0b !important; border-radius: 4px; position: relative; }
+        .badge-destacado-pdf { background-color: #f59e0b; color: #ffffff; font-size: 5.5pt; font-weight: bold; padding: 1px 4px; border-radius: 2px; display: inline-block; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
     </style>
 </head>
 <body>
@@ -316,97 +177,99 @@
 </div>
 {% endif %}
 
-
 {% if seccion == 'productos' or not seccion %}
-{% for marca, familias in catalogo.items %}
+{% for marca, familias in catalogo_paginado.items %}
 <div>
-    {% for familia, grupos in familias.items %}
-    <div class="seccion-familia" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
-        
-        <div class="titulo-familia">
-            <span class="etiqueta-rastreo">[[sec-{{ marca|slugify }}-{{ familia|slugify }}]]</span>
-            <span class="texto-titulo">{{ marca }} - {{ familia }}</span>
-        </div>
+    {% for familia, paginas in familias.items %}
+        {% for pagina in paginas %}
+        <div class="seccion-familia {% if forloop.first and forloop.parentloop.first and forloop.parentloop.parentloop.first %}primera-familia{% endif %}" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
+            <div class="titulo-familia">
+                <span class="etiqueta-rastreo">[[sec-{{ marca|slugify }}-{{ familia|slugify }}]]</span>
+                <span class="texto-titulo">{{ marca }} - {{ familia }}</span>
+            </div>
 
-        <div class="productos-grid">
-            {% for grupo_nombre, info in grupos.items %}
-            <div class="{% if info.es_ancha %}grupo-tarjeta-ancha{% else %}grupo-tarjeta{% endif %}">
-                
-                {% if info.es_ancha %}
-                    <div class="ancho-header-container">
-                        <div class="grupo-imagen-container" style="width: 100px; height: 100px; margin-bottom:0; margin-right: 15px;">
-                            {% if info.imagen_url %}
-                                <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+            <div class="pagina-productos {% if pagina.completa %}pagina-completa{% endif %}">
+                {% for fila in pagina.filas %}
+                <div class="fila-productos" style="flex: {{ fila.peso }} 1 auto;">
+                    {% for grupo_nombre, info in fila.items %}
+                    <div class="grupo-tarjeta {% if info.es_destacado %}tarjeta-destacada-pdf{% endif %} {% if info.es_ancha %}tarjeta-ancha{% endif %}">
+
+                        <div class="grupo-header">
+                            {% if info.marca_grupo %}
+                                <span class="marca-badge-pdf">{{ info.marca_grupo }}</span>
                             {% endif %}
-                        </div>
-                        <div class="ancho-header-info">
-                            <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
-                            {% if info.descripcion %}
-                                <p class="grupo-desc">{{ info.descripcion }}</p>
+                            {% if info.es_destacado %}
+                                <div>
+                                    <span class="badge-destacado-pdf">★ {{ info.etiqueta_destacado|default:"OFERTA" }}</span>
+                                </div>
                             {% endif %}
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="grupo-header">
                         <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
-                        {% if info.descripcion %}
-                            <p class="grupo-desc">{{ info.descripcion }}</p>
-                        {% endif %}
+
                     </div>
+
                     <div class="grupo-imagen-container">
                         {% if info.imagen_url %}
-                            <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}">
+                            <img src="{{ info.imagen_url }}" alt="{{ grupo_nombre }}" onerror="this.style.display='none';">
                         {% endif %}
                     </div>
-                {% endif %}
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="col-codigo-real">Código</th>
-                            <th class="col-ref">Ref</th>
-                            <th class="col-medida">Medida</th>
-                            {% if info.tiene_empaque_inner %}
-                                <th class="col-inner">Min</th>
-                            {% endif %}
-                            {% if not sin_precio %}
-                                <th class="col-precio">Precio</th>
-                            {% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for var in info.variantes %}
-                        <tr>
-                            <td class="col-codigo-real">{{ var.codigo|default:"---" }}</td>
-                            <td class="col-ref">{{ var.codigo_de_origen|default:"---" }}</td>
-                            <td class="col-medida">
-                                {% if info.variantes|length > 1 %}
-                                    {{ var.medida_mostrar|default:"--" }}
-                                {% else %}
-                                    --
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-codigo-real">Código</th>
+                                <th class="col-ref">Ref</th>
+                                <th class="col-medida">Medida</th>
+                                {% if info.tiene_empaque_inner %}
+                                    <th class="col-inner">Min</th>
                                 {% endif %}
-                            </td>
-                            {% if info.tiene_empaque_inner %}
-                                <td class="col-inner">{{ var.empaque_inner|default:"-" }}</td>
-                            {% endif %}
-                            {% if not sin_precio %}
-                            <td class="col-precio" style="text-align: right;">
-                                {% if var.precio_base_pesos %}
-                                    ${{ var.precio_base_pesos|floatformat:0 }}
-                                {% else %}
-                                    ---
+                                {% if not sin_precio %}
+                                    <th class="col-precio">Precio</th>
                                 {% endif %}
-                            </td>
-                            {% endif %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% regroup info.variantes by subgrupo_final as lista_subgrupos %}
+                            {% for subgrupo in lista_subgrupos %}
+                                {% if info.tiene_subgrupos and subgrupo.grouper and subgrupo.grouper != grupo_nombre %}
+                                <tr class="fila-subgrupo-header">
+                                    <td colspan="{% if info.tiene_empaque_inner and not sin_precio %}5{% elif info.tiene_empaque_inner or not sin_precio %}4{% else %}3{% endif %}">
+                                        {{ subgrupo.grouper }}
+                                    </td>
+                                </tr>
+                                {% endif %}
 
+                                {% for var in subgrupo.list %}
+                                <tr>
+                                    <td class="col-codigo-real">{{ var.codigo|default:"---" }}</td>
+                                    <td class="col-ref">{{ var.codigo_de_origen|default:"---" }}</td>
+                                    <td class="col-medida">
+                                        {% if info.variantes|length > 1 %}
+                                            {{ var.medida_mostrar|default:"--" }}
+                                        {% else %}
+                                            --
+                                        {% endif %}
+                                    </td>
+                                    {% if info.tiene_empaque_inner %}
+                                        <td class="col-inner">{{ var.empaque_inner|default:"-" }}</td>
+                                    {% endif %}
+                                    {% if not sin_precio %}
+                                    <td class="col-precio">
+                                        {{ var.precio_clp|default:"---" }}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
-    </div>
+        {% endfor %}
     {% endfor %}
 </div>
 {% endfor %}

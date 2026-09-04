@@ -1,4 +1,5 @@
 {% load static %}
+{% load catalogo_extras %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -48,13 +49,14 @@
                 <tr>
                     <th>Código Interno</th>
                     <th>Descripción de Medida</th>
-                    
+                    <th>Unidad de Medida</th>
+
                     {% if producto_base.empaque_inner or producto_base.empaque_master or producto_base.empaque_pallet %}
                         <th>Inner</th>
                         <th>Master</th>
                         <th>Pallet</th>
                     {% endif %}
-                    
+
                     <th>Precio Base</th>
                 </tr>
             </thead>
@@ -63,19 +65,22 @@
                 <tr>
                     <td><span class="text-mono">{{ var.codigo|default:"---" }}</span></td>
                     <td>{{ var.descripcion }}</td>
-                    
+                    <td>{{ var.unidad_medida|default:"-" }}</td>
+
                     {% if producto_base.empaque_inner or producto_base.empaque_master or producto_base.empaque_pallet %}
                         <td>{{ var.empaque_inner|default:"-" }}</td>
                         <td>{{ var.empaque_master|default:"-" }}</td>
                         <td>{{ var.empaque_pallet|default:"-" }}</td>
                     {% endif %}
-                    
+
                     <td class="precio">
-                        {% if var.precio_base_pesos %}
-                            ${{ var.precio_base_pesos|floatformat:0 }}
-                        {% else %}
-                            <span class="consultar">Consultar precio</span>
-                        {% endif %}
+                        {% with precio_formateado=var.precio_base_pesos|formato_clp %}
+                            {% if precio_formateado %}
+                                {{ precio_formateado }}
+                            {% else %}
+                                <span class="consultar">Consultar precio</span>
+                            {% endif %}
+                        {% endwith %}
                     </td>
                 </tr>
                 {% endfor %}

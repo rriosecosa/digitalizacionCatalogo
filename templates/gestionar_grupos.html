@@ -1,0 +1,277 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Productos y Grupos - Ecosa</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
+        .container { max-width: 1750px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .btn-regresar { background: #64748b; color: #fff; padding: 9px 16px; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-guardar-todo { background: #16a34a; color: #fff; border: none; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2); }
+        .btn-guardar-todo:hover { background: #15803d; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .search-bar { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 12px; }
+        .search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
+        .search-bar button { background: #0f172a; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+        th { background: #f1f5f9; padding: 12px 10px; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .input-text { width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.83rem; font-family: inherit; box-sizing: border-box; }
+        .input-text:focus { border-color: #2563eb; outline: 2px solid #93c5fd; background-color: #fff; }
+        .input-subgrupo { background-color: #f8fafc; border-color: #94a3b8; color: #0f172a; }
+        .input-limpio { background-color: #f0fdf4; border-color: #86efac; font-weight: 600; color: #166534; }
+        .input-orden { width: 60px; text-align: center; font-weight: 700; background-color: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .input-etiqueta { width: 90px; text-align: center; font-weight: 700; text-transform: uppercase; background-color: #fefce8; border-color: #fef08a; color: #854d0e; }
+        .destacado-box { display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .destacado-box input[type="checkbox"] { width: 18px; height: 18px; accent-color: #f59e0b; cursor: pointer; }
+        .badge-manual { background: #fef3c7; color: #92400e; font-size: 0.70rem; padding: 2px 6px; border-radius: 10px; font-weight: 600; display: inline-block; margin-top: 3px; }
+        .badge-limpio-manual { background: #dcfce7; color: #15803d; font-size: 0.70rem; padding: 2px 6px; border-radius: 10px; font-weight: 600; display: inline-block; margin-top: 3px; }
+        .btn-guardar-indiv { background: #2563eb; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+        .btn-guardar-indiv:hover { background: #1d4ed8; }
+        .btn-restaurar { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+        .btn-restaurar:hover { background: #fecaca; }
+        .acciones-fila { display: flex; gap: 5px; justify-content: center; align-items: center; }
+        .msg { padding: 12px 16px; margin-bottom: 16px; border-radius: 6px; font-weight: 500; }
+        .msg-success { background: #dcfce7; color: #166534; }
+        .paginacion { padding: 16px; display: flex; justify-content: center; gap: 6px; }
+        .paginacion a, .paginacion span { padding: 6px 12px; border: 1px solid #e2e8f0; background: white; text-decoration: none; color: #334155; border-radius: 4px; }
+        .paginacion .actual { background: #0f172a; color: white; font-weight: bold; }
+        .barra-inferior { padding: 16px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <datalist id="lista-grupos-existentes">
+        {% for grp in todos_los_grupos %}
+            <option value="{{ grp }}">
+        {% endfor %}
+    </datalist>
+
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Gestión de Nombres, Grupos, Subgrupos y Posición</h1>
+                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
+                    Asigna <strong>Subgrupos</strong> para dividir variantes (ej. Bolsa 10 Unidades) dentro de una misma tarjeta en el PDF.
+                </p>
+            </div>
+            <div class="header-actions">
+                <button type="submit" form="form-masivo" name="accion" value="guardar_pagina" class="btn-guardar-todo">
+                    <i class="bi bi-floppy-fill"></i> Guardar toda la página
+                </button>
+                <a href="{% url 'dashboard' %}" class="btn-regresar"><i class="bi bi-arrow-left"></i> Volver al Dashboard</a>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="msg msg-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="card">
+            <form class="search-bar" method="GET">
+                <input type="text" name="q" placeholder="Buscar por código, descripción o marca..." value="{{ busqueda }}">
+                <button type="submit"><i class="bi bi-search"></i> Buscar</button>
+            </form>
+
+            <form id="form-masivo" method="POST">
+                {% csrf_token %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 75px;">Código</th>
+                            <th style="width: 210px;">Descripción ERP</th>
+                            <th style="width: 80px;">Marca</th>
+                            <th style="width: 200px;">Grupo Asignado</th>
+                            <th style="width: 170px;">Subgrupo (Opcional)</th>
+                            <th style="width: 160px;">Medida (PDF)</th>
+                            <th style="width: 65px; text-align: center;">Posición</th>
+                            <th style="width: 65px; text-align: center;">¿Destacar?</th>
+                            <th style="width: 95px; text-align: center;">Etiqueta</th>
+                            <th style="width: 100px; text-align: center;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in productos %}
+                        <tr id="fila-{{ p.id }}">
+                            <td>
+                                <strong>{{ p.codigo }}</strong>
+                                <input type="hidden" name="producto_id[]" value="{{ p.id }}">
+                            </td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nueva_descripcion[]" 
+                                    class="input-text campo-desc-{{ p.id }}" 
+                                    value="{{ p.descripcion|default:'' }}"
+                                    placeholder="Descripción general..."
+                                >
+                            </td>
+                            <td>{{ p.proveedor.marca|default:"--" }}</td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nuevo_grupo[]" 
+                                    class="input-text campo-grupo-{{ p.id }}" 
+                                    list="lista-grupos-existentes" 
+                                    value="{{ p.grupo_activo }}"
+                                    placeholder="Grupo principal..."
+                                    autocomplete="off"
+                                >
+                                {% if p.grupo_manual %}
+                                    <span class="badge-manual">★ Grupo Manual</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nuevo_subgrupo[]" 
+                                    class="input-text input-subgrupo campo-subgrupo-{{ p.id }}" 
+                                    value="{{ p.subgrupo_activo|default:'' }}"
+                                    placeholder="Ej: Bolsa 10 Unidades"
+                                >
+                            </td>
+                            <td>
+                                <input 
+                                    type="text" 
+                                    name="nuevo_nombre_limpio[]" 
+                                    class="input-text input-limpio campo-limpio-{{ p.id }}" 
+                                    value="{{ p.nombre_limpio }}"
+                                    placeholder="Medida o variante..."
+                                >
+                                {% if p.nombre_limpio_es_manual %}
+                                    <span class="badge-limpio-manual">★ Editado</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <input 
+                                    type="number" 
+                                    name="orden_grupo[]" 
+                                    class="input-text input-orden campo-orden-{{ p.id }}" 
+                                    value="{{ p.orden_grupo|default:0 }}"
+                                    min="0"
+                                >
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="destacado-box">
+                                    <input 
+                                        type="checkbox" 
+                                        name="es_destacado[]" 
+                                        value="{{ p.id }}" 
+                                        class="campo-destacado-{{ p.id }}"
+                                        {% if p.es_destacado %}checked{% endif %}
+                                    >
+                                </div>
+                            </td>
+                            <td style="text-align: center;">
+                                <input 
+                                    type="text" 
+                                    name="etiqueta_destacado[]" 
+                                    class="input-text input-etiqueta campo-etiqueta-{{ p.id }}" 
+                                    value="{{ p.etiqueta_destacado|default:'OFERTA' }}"
+                                >
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="acciones-fila">
+                                    <button 
+                                        type="button" 
+                                        class="btn-guardar-indiv" 
+                                        onclick="guardarIndividual('{{ p.id }}');"
+                                    >
+                                        Guardar
+                                    </button>
+                                    {% if p.grupo_manual or p.nombre_limpio_es_manual or p.orden_grupo > 0 or p.es_destacado %}
+                                        <button 
+                                            type="submit" 
+                                            form="form-restaurar-{{ p.id }}" 
+                                            class="btn-restaurar" 
+                                            title="Restaurar valores automáticos"
+                                            onclick="return confirm('¿Restaurar producto {{ p.codigo }}?');"
+                                        >
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">No se encontraron productos.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="barra-inferior">
+                    <button type="submit" name="accion" value="guardar_pagina" class="btn-guardar-todo">
+                        <i class="bi bi-floppy-fill"></i> Guardar toda la página
+                    </button>
+                </div>
+            </form>
+
+            <form id="form-guardar-individual" method="POST" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="guardar_individual">
+                <input type="hidden" name="producto_id_individual" id="indiv_id">
+                <input type="hidden" name="nueva_descripcion_individual" id="indiv_desc">
+                <input type="hidden" name="nuevo_grupo_individual" id="indiv_grupo">
+                <input type="hidden" name="nuevo_subgrupo_individual" id="indiv_subgrupo">
+                <input type="hidden" name="nuevo_nombre_limpio_individual" id="indiv_limpio">
+                <input type="hidden" name="orden_grupo_individual" id="indiv_orden">
+                <input type="hidden" name="es_destacado_individual" id="indiv_destacado">
+                <input type="hidden" name="etiqueta_destacado_individual" id="indiv_etiqueta">
+            </form>
+
+            {% for p in productos %}
+                <form id="form-restaurar-{{ p.id }}" method="POST" style="display: none;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="restaurar_individual">
+                    <input type="hidden" name="producto_id_restaurar" value="{{ p.id }}">
+                    <input type="hidden" name="grupo_restaurar" value="{{ p.grupo_activo }}">
+                </form>
+            {% endfor %}
+
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="paginacion">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹ Anterior</a>
+                {% endif %}
+                <span class="actual">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">Siguiente ›</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function guardarIndividual(productoId) {
+            const desc = document.querySelector('.campo-desc-' + productoId).value;
+            const grupo = document.querySelector('.campo-grupo-' + productoId).value;
+            const subgrupo = document.querySelector('.campo-subgrupo-' + productoId).value;
+            const limpio = document.querySelector('.campo-limpio-' + productoId).value;
+            const orden = document.querySelector('.campo-orden-' + productoId).value;
+            const esDestacado = document.querySelector('.campo-destacado-' + productoId).checked ? '1' : '0';
+            const etiqueta = document.querySelector('.campo-etiqueta-' + productoId).value;
+
+            document.getElementById('indiv_id').value = productoId;
+            document.getElementById('indiv_desc').value = desc;
+            document.getElementById('indiv_grupo').value = grupo;
+            document.getElementById('indiv_subgrupo').value = subgrupo;
+            document.getElementById('indiv_limpio').value = limpio;
+            document.getElementById('indiv_orden').value = orden;
+            document.getElementById('indiv_destacado').value = esDestacado;
+            document.getElementById('indiv_etiqueta').value = etiqueta;
+
+            document.getElementById('form-guardar-individual').submit();
+        }
+    </script>
+</body>
+</html>

@@ -8,190 +8,244 @@
 <link rel="stylesheet" href="{% static 'css/exportar.css' %}" />
 <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
 
+<style>
+  /* Botones de selección de modo */
+  .btn-filtro-tipo {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-filtro-tipo:hover:not(.activo) {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+  .btn-filtro-tipo.activo {
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border-color: #15803d !important;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+  }
+
+  /* Botón desplegable para editar categorías */
+  .btn-toggle-editor {
+    width: 100%;
+    padding: 12px 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s ease;
+    margin-bottom: 15px;
+  }
+  .btn-toggle-editor:hover {
+    background: #f1f5f9;
+  }
+
+  /* Color verde para checkboxes seleccionados */
+  .custom-checkbox input:checked ~ .checkmark {
+    background-color: #16a34a !important;
+    border-color: #16a34a !important;
+  }
+</style>
 
 <div class="export-container">
   <div class="export-header">
     <h2>Exportar Catálogo a PDF</h2>
     <a href="{% url 'dashboard' %}" class="btn-volver">
-      <svg
-        width="16"
-        height="16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M10 19l-7-7m0 0l7-7m-7 7h18"
-        ></path>
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
       </svg>
       Volver al Panel
     </a>
   </div>
 
   <div class="export-alert">
-    <svg
-      width="24"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      viewBox="0 0 24 24"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      ></path>
+    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
     </svg>
-    <span
-      >Selecciona las familias o productos que deseas incluir.
-      <strong>Por defecto, todo el catálogo está seleccionado.</strong> Si
-      deseas excluir algo, simplemente desmárcalo.</span
-    >
+    <span>
+      Selecciona el tipo de catálogo a exportar. Por defecto, todas las categorías del catálogo seleccionado están incluidas. Puedes desplegar <strong>"Personalizar Categorías"</strong> si deseas excluir alguna.
+    </span>
   </div>
 
-  <form
-    id="form-exportar"
-    action="{% url 'generar_pdf' %}"
-    method="POST"
-    target="_blank"
-  >
+  <form id="form-exportar" action="{% url 'generar_pdf' %}" method="POST" target="_blank">
     {% csrf_token %}
-    <div
-      class="export-actions"
-      style="display: flex; justify-content: flex-end; margin-bottom: 15px"
-    >
-      <button type="button" id="btn-toggle-all" class="btn-secundario">
-        <svg
-          width="18"
-          height="18"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-          style="margin-right: 5px; vertical-align: middle"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          ></path>
-        </svg>
-        <span>Deseleccionar Todo</span>
-      </button>
+    <input type="hidden" name="modo_catalogo" id="input-modo-catalogo" value="truper">
+
+    <!-- 1. OPCIONES PRINCIPALES -->
+    <div style="margin-bottom: 24px;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">
+        1. Selecciona el Tipo de Catálogo:
+      </label>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button type="button" class="btn-filtro-tipo activo" data-modo="truper">
+          📙 Catálogo Truper 
+        </button>
+        <button type="button" class="btn-filtro-tipo" data-modo="ecosa">
+          📗 Catálogo Ecosa (Resto de Marcas)
+        </button>
+        <button type="button" class="btn-filtro-tipo" data-modo="todo">
+          🌐 Catálogo Completo (Todo)
+        </button>
+      </div>
     </div>
 
-    <div class="accordion-container">
-      {% for familia, grupos in arbol_familias.items %}
-      <div class="accordion-item">
-        <div class="accordion-title-bar">
-          <label class="custom-checkbox">
-            <input
-              type="checkbox"
-              class="familia-checkbox"
-              id="fam-{{ forloop.counter }}"
-              checked
-            />
-            <span class="checkmark"></span>
-          </label>
-          <button
-            class="accordion-btn"
-            type="button"
-            onclick="toggleAccordion('collapse-{{ forloop.counter }}')"
-          >
-            <span class="fam-name">{{ familia }}</span>
-            <span class="fam-badge">{{ grupos|length }} grupos</span>
-            <svg
-              class="chevron"
-              width="20"
-              height="20"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M19 9l-7 7-7-7"
-              ></path>
+    <!-- 2. DESPLEGABLE DE PERSONALIZACIÓN DE CATEGORÍAS (OCULTO POR DEFECTO) -->
+    <div style="margin-bottom: 20px;">
+      <button type="button" id="btn-toggle-editor" class="btn-toggle-editor">
+        <span style="display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+          </svg>
+          <span id="label-editor-categorias">Personalizar Categorías de Catálogo Truper</span>
+        </span>
+        <svg id="chevron-editor" class="chevron" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="transition: transform 0.2s;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </button>
+
+      <!-- Panel colapsable con las categorías -->
+      <div id="panel-editor-categorias" style="display: none; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; background: #fafafa; margin-bottom: 15px;">
+        <div class="export-actions" style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+          <button type="button" id="btn-toggle-all" class="btn-secundario" style="font-size: 0.85rem; padding: 6px 12px;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right: 4px; vertical-align: middle">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
+            <span>Deseleccionar Todo</span>
           </button>
         </div>
 
-        <div id="collapse-{{ forloop.counter }}" class="accordion-body closed">
-          <div class="grid-grupos">
-            {% for grupo in grupos %}
-            <label class="grupo-label" title="{{ grupo }}">
-              <div class="custom-checkbox small">
-                <input
-                  type="checkbox"
-                  name="grupos_seleccionados"
-                  value="{{ grupo }}"
-                  class="grupo-checkbox fam-child-{{ forloop.parentloop.counter }}"
-                  checked
-                />
+        <!-- CONTENEDOR 1: TRUPER -->
+        <div id="contenedor-truper" class="contenedor-modo accordion-container">
+          {% for familia, grupos in arbol_truper.items %}
+          <div class="accordion-item">
+            <div class="accordion-title-bar">
+              <label class="custom-checkbox">
+                <input type="checkbox" class="familia-checkbox" id="fam-truper-{{ forloop.counter }}" checked />
                 <span class="checkmark"></span>
+              </label>
+              <button class="accordion-btn" type="button" onclick="toggleAccordion('collapse-truper-{{ forloop.counter }}')">
+                <span class="fam-name">{{ familia }}</span>
+                <span class="fam-badge">{{ grupos|length }} grupos</span>
+                <svg class="chevron" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+            <div id="collapse-truper-{{ forloop.counter }}" class="accordion-body closed">
+              <div class="grid-grupos">
+                {% for grupo in grupos %}
+                <label class="grupo-label" title="{{ grupo }}">
+                  <div class="custom-checkbox small">
+                    <input type="checkbox" name="grupos_seleccionados" value="{{ grupo }}" class="grupo-checkbox fam-child-truper-{{ forloop.parentloop.counter }}" checked />
+                    <span class="checkmark"></span>
+                  </div>
+                  <span class="grupo-name">{{ grupo }}</span>
+                </label>
+                {% endfor %}
               </div>
-              <span class="grupo-name">{{ grupo }}</span>
-            </label>
-            {% endfor %}
+            </div>
           </div>
+          {% endfor %}
+        </div>
+
+        <!-- CONTENEDOR 2: ECOSA -->
+        <div id="contenedor-ecosa" class="contenedor-modo accordion-container" style="display: none;">
+          {% for familia, grupos in arbol_ecosa.items %}
+          <div class="accordion-item">
+            <div class="accordion-title-bar">
+              <label class="custom-checkbox">
+                <input type="checkbox" class="familia-checkbox" id="fam-ecosa-{{ forloop.counter }}" />
+                <span class="checkmark"></span>
+              </label>
+              <button class="accordion-btn" type="button" onclick="toggleAccordion('collapse-ecosa-{{ forloop.counter }}')">
+                <span class="fam-name">{{ familia }}</span>
+                <span class="fam-badge">{{ grupos|length }} grupos</span>
+                <svg class="chevron" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+            <div id="collapse-ecosa-{{ forloop.counter }}" class="accordion-body closed">
+              <div class="grid-grupos">
+                {% for grupo in grupos %}
+                <label class="grupo-label" title="{{ grupo }}">
+                  <div class="custom-checkbox small">
+                    <input type="checkbox" name="grupos_seleccionados" value="{{ grupo }}" class="grupo-checkbox fam-child-ecosa-{{ forloop.parentloop.counter }}" />
+                    <span class="checkmark"></span>
+                  </div>
+                  <span class="grupo-name">{{ grupo }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- CONTENEDOR 3: TODO -->
+        <div id="contenedor-todo" class="contenedor-modo accordion-container" style="display: none;">
+          {% for familia, grupos in arbol_todo.items %}
+          <div class="accordion-item">
+            <div class="accordion-title-bar">
+              <label class="custom-checkbox">
+                <input type="checkbox" class="familia-checkbox" id="fam-todo-{{ forloop.counter }}" />
+                <span class="checkmark"></span>
+              </label>
+              <button class="accordion-btn" type="button" onclick="toggleAccordion('collapse-todo-{{ forloop.counter }}')">
+                <span class="fam-name">{{ familia }}</span>
+                <span class="fam-badge">{{ grupos|length }} grupos</span>
+                <svg class="chevron" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+            <div id="collapse-todo-{{ forloop.counter }}" class="accordion-body closed">
+              <div class="grid-grupos">
+                {% for grupo in grupos %}
+                <label class="grupo-label" title="{{ grupo }}">
+                  <div class="custom-checkbox small">
+                    <input type="checkbox" name="grupos_seleccionados" value="{{ grupo }}" class="grupo-checkbox fam-child-todo-{{ forloop.parentloop.counter }}" />
+                    <span class="checkmark"></span>
+                  </div>
+                  <span class="grupo-name">{{ grupo }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
         </div>
       </div>
-      {% endfor %}
     </div>
 
-    <div
-      class="export-footer"
-      style="display: flex; gap: 15px; justify-content: flex-end"
-    >
-      <button
-        type="submit"
-        name="tipo_catalogo"
-        value="sin_precio"
-        class="btn-generar"
-        style="background-color: #64748b; border-color: #475569"
-      >
-        <svg
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          ></path>
+    <!-- 3. FOOTER BOTONES -->
+    <div class="export-footer" style="display: flex; gap: 15px; justify-content: flex-end; margin-top: 10px;">
+      <button type="submit" name="tipo_catalogo" value="sin_precio" class="btn-generar" style="background-color: #64748b; border-color: #475569">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
         Generar PDF SIN Precios
       </button>
 
-      <button
-        type="submit"
-        name="tipo_catalogo"
-        value="con_precio"
-        class="btn-generar"
-      >
-        <svg
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          ></path>
+      <button type="submit" name="tipo_catalogo" value="con_precio" class="btn-generar" style="background-color: #16a34a; border-color: #15803d;">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
         Generar PDF CON Precios
       </button>
@@ -203,15 +257,11 @@
   <div class="loader-content">
     <div class="spinner"></div>
     <h3>Construyendo Catálogo...</h3>
-    <p>
-      Procesando estructura, dibujando imágenes y aplicando orden de marcas.
-      Esto tomará unos segundos.
-    </p>
+    <p>Procesando estructura, dibujando imágenes y aplicando orden de marcas. Esto tomará unos segundos.</p>
   </div>
 </div>
 
 <script>
-  // 0. Toggle de acordeones
   function toggleAccordion(id) {
     const element = document.getElementById(id);
     const icon = element.previousElementSibling.querySelector(".chevron");
@@ -225,95 +275,123 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    // 1. Lógica de Checkboxes Familia/Producto
-    const familiaCheckboxes = document.querySelectorAll(".familia-checkbox");
-    familiaCheckboxes.forEach(function (famCheck) {
+    const botonesModo = document.querySelectorAll(".btn-filtro-tipo");
+    const inputModo = document.getElementById("input-modo-catalogo");
+    const contenedores = document.querySelectorAll(".contenedor-modo");
+    const labelEditor = document.getElementById("label-editor-categorias");
+    const btnToggleEditor = document.getElementById("btn-toggle-editor");
+    const panelEditor = document.getElementById("panel-editor-categorias");
+    const chevronEditor = document.getElementById("chevron-editor");
+    const btnToggleAll = document.getElementById("btn-toggle-all");
+    const textToggleAll = btnToggleAll.querySelector("span");
+
+    const titulos = {
+      truper: "Personalizar Categorías de Catálogo Truper",
+      ecosa: "Personalizar Categorías de Catálogo Ecosa",
+      todo: "Personalizar Categorías de Catálogo Completo"
+    };
+
+    // Desplegar / Ocultar panel de personalización de categorías
+    btnToggleEditor.addEventListener("click", function () {
+      const estaOculto = panelEditor.style.display === "none";
+      panelEditor.style.display = estaOculto ? "block" : "none";
+      chevronEditor.style.transform = estaOculto ? "rotate(180deg)" : "rotate(0deg)";
+    });
+
+    // Conmutación de modo (Truper / Ecosa / Todo)
+    botonesModo.forEach((btn) => {
+      btn.addEventListener("click", function () {
+        botonesModo.forEach((b) => b.classList.remove("activo"));
+        this.classList.add("activo");
+
+        const modo = this.getAttribute("data-modo");
+        inputModo.value = modo;
+        labelEditor.textContent = titulos[modo];
+
+        contenedores.forEach((c) => {
+          c.style.display = "none";
+          c.querySelectorAll("input[type='checkbox']").forEach((chk) => (chk.checked = false));
+        });
+
+        const contActivo = document.getElementById("contenedor-" + modo);
+        contActivo.style.display = "block";
+        contActivo.querySelectorAll("input[type='checkbox']").forEach((chk) => (chk.checked = true));
+
+        textToggleAll.textContent = "Deseleccionar Todo";
+      });
+    });
+
+    // Checkboxes de familia y grupos
+    document.querySelectorAll(".familia-checkbox").forEach(function (famCheck) {
       famCheck.addEventListener("change", function () {
-        const famId = this.id.split("-")[1];
-        const childCheckboxes = document.querySelectorAll(
-          ".fam-child-" + famId,
-        );
-        childCheckboxes.forEach(function (child) {
+        const idParts = this.id.split("-");
+        const modo = idParts[1];
+        const famId = idParts[2];
+        const childClass = `.fam-child-${modo}-${famId}`;
+        document.querySelectorAll(childClass).forEach((child) => {
           child.checked = famCheck.checked;
         });
       });
     });
 
-    const grupoCheckboxes = document.querySelectorAll(".grupo-checkbox");
-    grupoCheckboxes.forEach(function (grupoCheck) {
+    document.querySelectorAll(".grupo-checkbox").forEach(function (grupoCheck) {
       grupoCheck.addEventListener("change", function () {
-        const famClass = Array.from(this.classList).find((cls) =>
-          cls.startsWith("fam-child-"),
-        );
+        const famClass = Array.from(this.classList).find((cls) => cls.startsWith("fam-child-"));
         if (famClass) {
-          const famId = famClass.split("-")[2];
-          const parentFamCheck = document.getElementById("fam-" + famId);
-
+          const parts = famClass.split("-");
+          const modo = parts[2];
+          const famId = parts[3];
+          const parentFamCheck = document.getElementById(`fam-${modo}-${famId}`);
           const siblings = document.querySelectorAll("." + famClass);
+
           const allChecked = Array.from(siblings).every((c) => c.checked);
           const someChecked = Array.from(siblings).some((c) => c.checked);
 
-          parentFamCheck.checked = allChecked;
-          parentFamCheck.indeterminate = !allChecked && someChecked;
+          if (parentFamCheck) {
+            parentFamCheck.checked = allChecked;
+            parentFamCheck.indeterminate = !allChecked && someChecked;
+          }
         }
       });
     });
 
-    // 2. LÓGICA DE LA PANTALLA DE CARGA
+    // Toggle Seleccionar/Deseleccionar todo en el modo activo
+    btnToggleAll.addEventListener("click", function () {
+      const modoActual = inputModo.value;
+      const contenedorActivo = document.getElementById("contenedor-" + modoActual);
+      const checks = contenedorActivo.querySelectorAll("input[type='checkbox']");
+
+      const algunDesmarcado = Array.from(checks).some((c) => !c.checked);
+      const nuevoEstado = algunDesmarcado;
+
+      checks.forEach((c) => {
+        c.checked = nuevoEstado;
+        c.indeterminate = false;
+      });
+
+      textToggleAll.textContent = nuevoEstado ? "Deseleccionar Todo" : "Seleccionar Todo";
+    });
+
+    // Validación de historial y loader overlay
     const formExportar = document.getElementById("form-exportar");
     const loaderOverlay = document.getElementById("loader-overlay");
 
-    // === MODIFICA ESTA LÍNEA PARA AGREGAR EL (event) ===
     formExportar.addEventListener("submit", function (event) {
-      // =============================================================
-      // === AGREGA ESTE BLOQUE DE ADVERTENCIA AQUÍ ===
       const cantidadActual = parseInt("{{ cantidad_catalogos|default:'0' }}");
       if (cantidadActual >= 3) {
         const mensaje =
           "Ya has alcanzado el límite de 3 catálogos guardados en el historial.\n\nAl continuar, el catálogo MÁS ANTIGUO se borrará permanentemente para hacer espacio.\n\n¿Estás seguro de que deseas generar uno nuevo?";
         if (!confirm(mensaje)) {
-          event.preventDefault(); // Cancela el envío del formulario si presiona Cancelar
+          event.preventDefault();
           return false;
         }
       }
-      // =============================================================
-
-      // Mostrar la pantalla de carga (Tu código original)
       loaderOverlay.classList.add("active");
-
-      // Cuando el usuario vuelva a esta pestaña (después de ver el PDF), quitamos el loader
       window.addEventListener("focus", function hideLoader() {
         loaderOverlay.classList.remove("active");
-        // Removemos el evento para que no se acumule
         window.removeEventListener("focus", hideLoader);
       });
     });
   });
-  // NUEVO: Lógica del botón Seleccionar/Deseleccionar todo
-  const btnToggleAll = document.getElementById("btn-toggle-all");
-  const textToggleAll = btnToggleAll.querySelector("span");
-  // Asumimos que todo está seleccionado por defecto (basado en tu HTML)
-  let allSelected = true;
-
-  btnToggleAll.addEventListener("click", function () {
-    allSelected = !allSelected; // Invertimos el estado
-
-    const allCheckboxes = document.querySelectorAll(
-      ".familia-checkbox, .grupo-checkbox",
-    );
-
-    allCheckboxes.forEach(function (checkbox) {
-      checkbox.checked = allSelected;
-      checkbox.indeterminate = false; // Importante: limpiar estados intermedios
-    });
-
-    // Cambiamos el texto y el icono dependiendo del estado
-    if (allSelected) {
-      textToggleAll.textContent = "Deseleccionar Todo";
-    } else {
-      textToggleAll.textContent = "Seleccionar Todo";
-    }
-  });
 </script>
-
 {% endblock %}

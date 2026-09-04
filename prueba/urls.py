@@ -43,6 +43,8 @@ urlpatterns = [
     # --------------------------------------------------------
     path('catalogo/historial/eliminar/<int:catalogo_id>/', views.eliminar_catalogo, name='eliminar_catalogo'),
     path('catalogo/marcar-vigente/<int:catalogo_id>/', views.marcar_catalogo_vigente, name='marcar_catalogo_vigente'),
+    path('dashboard/grupos/', views.gestionar_grupos, name='gestionar_grupos'),
+    path('api/sugerencias/', views.sugerencias_busqueda, name='sugerencias_busqueda')
 ]
 
 # ESTAS LÍNEAS LE DICEN A DJANGO DÓNDE ENCONTRAR LAS IMÁGENES DE /media/ EN ENTORNO DE DESARROLLO
