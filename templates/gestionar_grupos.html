@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Productos y Grupos - Ecosa</title>
+<<<<<<< HEAD
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -44,6 +45,13 @@
         .paginacion .actual { background: #0f172a; color: white; font-weight: bold; }
         .barra-inferior { padding: 16px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
     </style>
+=======
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{% static 'css/gestionar.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
 </head>
 <body>
     <datalist id="lista-grupos-existentes">
@@ -55,10 +63,15 @@
     <div class="container">
         <div class="header">
             <div>
+<<<<<<< HEAD
                 <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Gestión de Nombres, Grupos, Subgrupos y Posición</h1>
                 <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
                     Asigna <strong>Subgrupos</strong> para dividir variantes (ej. Bolsa 10 Unidades) dentro de una misma tarjeta en el PDF.
                 </p>
+=======
+                <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Gestión de Nombres y Agrupaciones</h1>
+                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">Guarda productos de forma individual o guarda los cambios de toda la página a la vez.</p>
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
             </div>
             <div class="header-actions">
                 <button type="submit" form="form-masivo" name="accion" value="guardar_pagina" class="btn-guardar-todo">
@@ -80,11 +93,16 @@
                 <button type="submit"><i class="bi bi-search"></i> Buscar</button>
             </form>
 
+<<<<<<< HEAD
+=======
+            <!-- Formulario Masivo de la Página -->
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
             <form id="form-masivo" method="POST">
                 {% csrf_token %}
                 <table>
                     <thead>
                         <tr>
+<<<<<<< HEAD
                             <th style="width: 75px;">Código</th>
                             <th style="width: 210px;">Descripción ERP</th>
                             <th style="width: 80px;">Marca</th>
@@ -95,6 +113,14 @@
                             <th style="width: 65px; text-align: center;">¿Destacar?</th>
                             <th style="width: 95px; text-align: center;">Etiqueta</th>
                             <th style="width: 100px; text-align: center;">Acción</th>
+=======
+                            <th style="width: 95px;">Código</th>
+                            <th style="width: 320px;">Descripción (ERP/Web)</th>
+                            <th style="width: 100px;">Marca</th>
+                            <th style="width: 300px;">Grupo Asignado</th>
+                            <th style="width: 220px;">Nombre Limpio / Medida (PDF)</th>
+                            <th style="width: 140px; text-align: center;">Acción</th>
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                         </tr>
                     </thead>
                     <tbody>
@@ -121,7 +147,11 @@
                                     class="input-text campo-grupo-{{ p.id }}" 
                                     list="lista-grupos-existentes" 
                                     value="{{ p.grupo_activo }}"
+<<<<<<< HEAD
                                     placeholder="Grupo principal..."
+=======
+                                    placeholder="Selecciona o escribe..."
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                                     autocomplete="off"
                                 >
                                 {% if p.grupo_manual %}
@@ -131,6 +161,7 @@
                             <td>
                                 <input 
                                     type="text" 
+<<<<<<< HEAD
                                     name="nuevo_subgrupo[]" 
                                     class="input-text input-subgrupo campo-subgrupo-{{ p.id }}" 
                                     value="{{ p.subgrupo_activo|default:'' }}"
@@ -140,12 +171,15 @@
                             <td>
                                 <input 
                                     type="text" 
+=======
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                                     name="nuevo_nombre_limpio[]" 
                                     class="input-text input-limpio campo-limpio-{{ p.id }}" 
                                     value="{{ p.nombre_limpio }}"
                                     placeholder="Medida o variante..."
                                 >
                                 {% if p.nombre_limpio_es_manual %}
+<<<<<<< HEAD
                                     <span class="badge-limpio-manual">★ Editado</span>
                                 {% endif %}
                             </td>
@@ -178,21 +212,40 @@
                                 >
                             </td>
                             <td style="text-align: center;">
+=======
+                                    <span class="badge-limpio-manual">★ Editado a mano</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                                 <div class="acciones-fila">
                                     <button 
                                         type="button" 
                                         class="btn-guardar-indiv" 
+<<<<<<< HEAD
+=======
+                                        title="Guardar solo este producto"
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                                         onclick="guardarIndividual('{{ p.id }}');"
                                     >
                                         Guardar
                                     </button>
+<<<<<<< HEAD
                                     {% if p.grupo_manual or p.nombre_limpio_es_manual or p.orden_grupo > 0 or p.es_destacado %}
+=======
+                                    {% if p.grupo_manual or p.nombre_limpio_es_manual %}
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                                         <button 
                                             type="submit" 
                                             form="form-restaurar-{{ p.id }}" 
                                             class="btn-restaurar" 
+<<<<<<< HEAD
                                             title="Restaurar valores automáticos"
                                             onclick="return confirm('¿Restaurar producto {{ p.codigo }}?');"
+=======
+                                            title="Restaurar a valores automáticos"
+                                            onclick="return confirm('¿Restaurar producto {{ p.codigo }} a sus valores automáticos?');"
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                                         >
                                             <i class="bi bi-arrow-counterclockwise"></i>
                                         </button>
@@ -202,7 +255,11 @@
                         </tr>
                         {% empty %}
                         <tr>
+<<<<<<< HEAD
                             <td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">No se encontraron productos.</td>
+=======
+                            <td colspan="6" style="text-align: center; padding: 24px; color: #94a3b8;">No se encontraron productos.</td>
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -215,12 +272,17 @@
                 </div>
             </form>
 
+<<<<<<< HEAD
+=======
+            <!-- Formulario oculto auxiliar para procesar guardados individuales -->
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
             <form id="form-guardar-individual" method="POST" style="display: none;">
                 {% csrf_token %}
                 <input type="hidden" name="accion" value="guardar_individual">
                 <input type="hidden" name="producto_id_individual" id="indiv_id">
                 <input type="hidden" name="nueva_descripcion_individual" id="indiv_desc">
                 <input type="hidden" name="nuevo_grupo_individual" id="indiv_grupo">
+<<<<<<< HEAD
                 <input type="hidden" name="nuevo_subgrupo_individual" id="indiv_subgrupo">
                 <input type="hidden" name="nuevo_nombre_limpio_individual" id="indiv_limpio">
                 <input type="hidden" name="orden_grupo_individual" id="indiv_orden">
@@ -235,6 +297,20 @@
                     <input type="hidden" name="producto_id_restaurar" value="{{ p.id }}">
                     <input type="hidden" name="grupo_restaurar" value="{{ p.grupo_activo }}">
                 </form>
+=======
+                <input type="hidden" name="nuevo_nombre_limpio_individual" id="indiv_limpio">
+            </form>
+
+            <!-- Formularios individuales para restaurar -->
+            {% for p in productos %}
+                {% if p.grupo_manual or p.nombre_limpio_es_manual %}
+                    <form id="form-restaurar-{{ p.id }}" method="POST" style="display: none;">
+                        {% csrf_token %}
+                        <input type="hidden" name="accion" value="restaurar_individual">
+                        <input type="hidden" name="producto_id_restaurar" value="{{ p.id }}">
+                    </form>
+                {% endif %}
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
             {% endfor %}
 
             {% if page_obj.paginator.num_pages > 1 %}
@@ -255,20 +331,28 @@
         function guardarIndividual(productoId) {
             const desc = document.querySelector('.campo-desc-' + productoId).value;
             const grupo = document.querySelector('.campo-grupo-' + productoId).value;
+<<<<<<< HEAD
             const subgrupo = document.querySelector('.campo-subgrupo-' + productoId).value;
             const limpio = document.querySelector('.campo-limpio-' + productoId).value;
             const orden = document.querySelector('.campo-orden-' + productoId).value;
             const esDestacado = document.querySelector('.campo-destacado-' + productoId).checked ? '1' : '0';
             const etiqueta = document.querySelector('.campo-etiqueta-' + productoId).value;
+=======
+            const limpio = document.querySelector('.campo-limpio-' + productoId).value;
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
 
             document.getElementById('indiv_id').value = productoId;
             document.getElementById('indiv_desc').value = desc;
             document.getElementById('indiv_grupo').value = grupo;
+<<<<<<< HEAD
             document.getElementById('indiv_subgrupo').value = subgrupo;
             document.getElementById('indiv_limpio').value = limpio;
             document.getElementById('indiv_orden').value = orden;
             document.getElementById('indiv_destacado').value = esDestacado;
             document.getElementById('indiv_etiqueta').value = etiqueta;
+=======
+            document.getElementById('indiv_limpio').value = limpio;
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
 
             document.getElementById('form-guardar-individual').submit();
         }

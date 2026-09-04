@@ -188,10 +188,22 @@ class HistorialCatalogo(models.Model):
         super().delete(*args, **kwargs)
 
 
+<<<<<<< HEAD
 class ProductoGrupoManual(models.Model):
     producto_id = models.IntegerField(unique=True, db_index=True)
     grupo_personalizado = models.CharField(max_length=255)
     subgrupo_personalizado = models.CharField(max_length=255, null=True, blank=True)
+=======
+# =====================================================================
+# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
+# =====================================================================
+# =====================================================================
+# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
+# =====================================================================
+class ProductoGrupoManual(models.Model):
+    producto_id = models.IntegerField(unique=True, db_index=True)
+    grupo_personalizado = models.CharField(max_length=255)
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
     nombre_limpio_personalizado = models.CharField(max_length=255, null=True, blank=True)
     actualizado_el = models.DateTimeField(auto_now=True)
 
@@ -200,4 +212,8 @@ class ProductoGrupoManual(models.Model):
         verbose_name_plural = "Grupos Manuales de Productos"
 
     def __str__(self):
+<<<<<<< HEAD
         return f"Prod #{self.producto_id} -> {self.grupo_personalizado} ({self.subgrupo_personalizado or 'Sin Subgrupo'})"
+=======
+        return f"Prod #{self.producto_id} -> {self.grupo_personalizado} ({self.nombre_limpio_personalizado})"
+>>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
