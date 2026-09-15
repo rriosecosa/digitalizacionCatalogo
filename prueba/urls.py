@@ -37,17 +37,24 @@ urlpatterns = [
     path('catalogo/historial/', views.historial_catalogo, name='historial_catalogo'),
     path('catalogo/descargar/', views.descargar_catalogo, name='descargar_catalogo'),
     path('catalogo/descargar/<int:catalogo_id>/', views.descargar_catalogo_version, name='descargar_catalogo_version'),
-    
+
     # --------------------------------------------------------
     # NUEVO: Eliminar catálogo (Solo Superusuarios)
     # --------------------------------------------------------
     path('catalogo/historial/eliminar/<int:catalogo_id>/', views.eliminar_catalogo, name='eliminar_catalogo'),
     path('catalogo/marcar-vigente/<int:catalogo_id>/', views.marcar_catalogo_vigente, name='marcar_catalogo_vigente'),
     path('dashboard/grupos/', views.gestionar_grupos, name='gestionar_grupos'),
-<<<<<<< HEAD
-    path('api/sugerencias/', views.sugerencias_busqueda, name='sugerencias_busqueda')
-=======
->>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
+    path('api/sugerencias/', views.sugerencias_busqueda, name='sugerencias_busqueda'),
+    path('generar-pdf/iniciar/', views.iniciar_generacion_pdf, name='iniciar_generacion_pdf'),
+    path('generar-pdf/estado/<str:job_id>/', views.estado_generacion_pdf, name='estado_generacion_pdf'),
+    path('generar-pdf/ver/<int:catalogo_id>/', views.ver_pdf_generado, name='ver_pdf_generado'),
+
+    # --------------------------------------------------------
+    # NUEVO: Sincronización de productos con el ERP
+    # --------------------------------------------------------
+    path("productos/sincronizar/", views.sincronizar_productos, name="sincronizar_productos"),
+    path("productos/sincronizar/ejecutar/", views.sincronizar_productos_ejecutar, name="sincronizar_productos_ejecutar"),
+    path("productos/sincronizar/prueba/", views.sincronizar_productos_dry_run, name="sincronizar_productos_dry_run"),
 ]
 
 # ESTAS LÍNEAS LE DICEN A DJANGO DÓNDE ENCONTRAR LAS IMÁGENES DE /media/ EN ENTORNO DE DESARROLLO

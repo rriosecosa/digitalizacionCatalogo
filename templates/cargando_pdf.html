@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Generando catálogo...</title>
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: #f8fafc;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .contenedor {
+            text-align: center;
+            padding: 40px;
+        }
+
+        /* ============================================================
+           OPCIÓN A (activa por defecto): anillo doble en CSS puro.
+           Sin dependencias externas, no se puede "romper" nunca.
+           ============================================================ */
+        .anillo {
+            position: relative;
+            width: 84px;
+            height: 84px;
+            margin: 0 auto 28px auto;
+        }
+        .anillo div {
+            position: absolute;
+            border: 5px solid transparent;
+            border-top-color: #1c960c;
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
+            animation: girar 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+        .anillo div:nth-child(2) {
+            width: 70%;
+            height: 70%;
+            top: 15%;
+            left: 15%;
+            border-top-color: #7bc36f;
+            animation-duration: 0.9s;
+            animation-direction: reverse;
+        }
+        @keyframes girar {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============================================================
+           OPCIÓN B (si prefieres tu propio GIF): descomenta este bloque
+           y comenta el .anillo de arriba, y usa el <img id="gif"> del
+           HTML en vez del <div class="anillo">.
+           ============================================================ */
+        /*
+        #gif {
+            width: 90px;
+            height: 90px;
+            margin: 0 auto 28px auto;
+            display: block;
+        }
+        */
+
+        h1 {
+            font-size: 18pt;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        p {
+            font-size: 11pt;
+            color: #64748b;
+            max-width: 360px;
+        }
+        .error {
+            color: #dc2626;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor">
+
+        <!-- OPCIÓN A: anillo CSS (activo) -->
+        <div class="anillo" id="indicador">
+            <div></div>
+            <div></div>
+        </div>
+
+
+        <h1 id="titulo">Generando tu catálogo...</h1>
+        <p id="mensaje">Estamos recolectando la información de los productos. No cierres esta pestaña.</p>
+    </div>
+
+    <script>
+    (function () {
+        const jobId = "{{ job_id }}";
+        const titulo = document.getElementById('titulo');
+        const mensaje = document.getElementById('mensaje');
+        const indicador = document.getElementById('indicador');
+
+        function consultarEstado() {
+            fetch(`/generar-pdf/estado/${jobId}/`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.estado === 'listo') {
+                        titulo.textContent = '¡Listo! Abriendo el catálogo...';
+                        mensaje.textContent = 'Ya casi.';
+                        window.location.href = `/generar-pdf/ver/${data.catalogo_id}/`;
+                    } else if (data.estado === 'error') {
+                        if (indicador) indicador.style.display = 'none';
+                        titulo.textContent = 'Ocurrió un problema';
+                        titulo.classList.add('error');
+                        mensaje.textContent = 'No se pudo generar el catálogo. Cierra esta pestaña y vuelve a intentarlo desde Exportar.';
+                    } else if (data.estado === 'desconocido') {
+                        if (indicador) indicador.style.display = 'none';
+                        titulo.textContent = 'No se encontró el trabajo';
+                        titulo.classList.add('error');
+                        mensaje.textContent = 'Cierra esta pestaña y vuelve a intentarlo.';
+                    } else {
+                        setTimeout(consultarEstado, 2000);
+                    }
+                })
+                .catch(() => {
+                    setTimeout(consultarEstado, 2000);
+                });
+        }
+
+        consultarEstado();
+    })();
+    </script>
+
+</body>
+</html>

@@ -83,7 +83,7 @@
     </span>
   </div>
 
-  <form id="form-exportar" action="{% url 'generar_pdf' %}" method="POST" target="_blank">
+  <form id="form-exportar" action="{% url 'iniciar_generacion_pdf' %}" method="POST" target="_blank">
     {% csrf_token %}
     <input type="hidden" name="modo_catalogo" id="input-modo-catalogo" value="truper">
 

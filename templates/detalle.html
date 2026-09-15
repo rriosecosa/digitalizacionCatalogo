@@ -16,7 +16,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         Volver al catálogo
     </a>
-    
+
     <div class="header-detalle">
         {% if marca %}
             <span class="marca">{{ marca }}</span>
@@ -64,7 +64,7 @@
                 {% for var in variantes %}
                 <tr>
                     <td><span class="text-mono">{{ var.codigo|default:"---" }}</span></td>
-                    <td>{{ var.descripcion }}</td>
+                    <td>{{ var.nombre_limpio }}</td>
                     <td>{{ var.unidad_medida|default:"-" }}</td>
 
                     {% if producto_base.empaque_inner or producto_base.empaque_master or producto_base.empaque_pallet %}

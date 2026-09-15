@@ -188,22 +188,17 @@ class HistorialCatalogo(models.Model):
         super().delete(*args, **kwargs)
 
 
-<<<<<<< HEAD
+# =====================================================================
+# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
+# =====================================================================
+# NOTA (Claude): esta clase estaba duplicada en el archivo original —
+# una definición tenía `subgrupo_personalizado` y la otra tenía
+# `nombre_limpio_personalizado` + `actualizado_el`. Las fusioné en una
+# sola clase con todos los campos, ya que ambos se usan en views.py.
 class ProductoGrupoManual(models.Model):
     producto_id = models.IntegerField(unique=True, db_index=True)
     grupo_personalizado = models.CharField(max_length=255)
     subgrupo_personalizado = models.CharField(max_length=255, null=True, blank=True)
-=======
-# =====================================================================
-# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
-# =====================================================================
-# =====================================================================
-# MODELO PARA ASIGNACIÓN Y CONTROL EDITABLE DE GRUPOS (MÉTODO OVERRIDE)
-# =====================================================================
-class ProductoGrupoManual(models.Model):
-    producto_id = models.IntegerField(unique=True, db_index=True)
-    grupo_personalizado = models.CharField(max_length=255)
->>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
     nombre_limpio_personalizado = models.CharField(max_length=255, null=True, blank=True)
     actualizado_el = models.DateTimeField(auto_now=True)
 
@@ -212,8 +207,21 @@ class ProductoGrupoManual(models.Model):
         verbose_name_plural = "Grupos Manuales de Productos"
 
     def __str__(self):
-<<<<<<< HEAD
         return f"Prod #{self.producto_id} -> {self.grupo_personalizado} ({self.subgrupo_personalizado or 'Sin Subgrupo'})"
-=======
-        return f"Prod #{self.producto_id} -> {self.grupo_personalizado} ({self.nombre_limpio_personalizado})"
->>>>>>> 0427675e20049cd97fd840466187c4c4ed28bdea
+
+
+class SyncLog(models.Model):
+    fecha = models.DateTimeField()
+    estado = models.CharField(max_length=20)
+    creados = models.IntegerField(default=0)
+    actualizados = models.IntegerField(default=0)
+    errores = models.IntegerField(default=0)
+    detalle = models.TextField(blank=True)
+    detalle_cambios = models.JSONField(blank=True, null=True)
+    detalle_errores = models.JSONField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        return f"Sync {self.fecha:%Y-%m-%d %H:%M} - {self.estado}"

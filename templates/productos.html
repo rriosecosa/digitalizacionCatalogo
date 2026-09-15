@@ -69,7 +69,7 @@
             <h1>Catálogo de Productos</h1>
             <p>Explora la disponibilidad agrupada por modelo, marca y familia</p>
         </div>
-        
+
         <div class="topbar-actions">
             {% if user.is_authenticated %}
                 <span class="usuario-actual">
@@ -121,11 +121,11 @@
                     {% if marca_actual %}
                         <input type="hidden" name="marca" value="{{ marca_actual }}">
                     {% endif %}
-                    <input 
-                        type="text" 
-                        name="q" 
+                    <input
+                        type="text"
+                        name="q"
                         id="inputBusqueda"
-                        placeholder="Nombre, código o marca..." 
+                        placeholder="Nombre, código o proveedor..."
                         value="{{ busqueda }}"
                         autocomplete="off"
                     >
@@ -154,7 +154,7 @@
             </details>
 
             <details class="bloque-filtro" open>
-                <summary>Marcas</summary>
+                <summary>Proveedor</summary>
                 <ul class="lista-opciones">
                     {% for marca in marcas %}
                         <li>
@@ -164,11 +164,11 @@
                             </a>
                         </li>
                     {% empty %}
-                        <li class="sin-opciones">No hay marcas disponibles.</li>
+                        <li class="sin-opciones">No hay proveedores disponibles.</li>
                     {% endfor %}
                 </ul>
                 {% if marca_actual %}
-                    <a class="limpiar-filtro" href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de marca</a>
+                    <a class="limpiar-filtro" href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de proveedor</a>
                 {% endif %}
             </details>
 
@@ -197,7 +197,7 @@
                     {% endif %}
                     {% if marca_actual %}
                         <div class="chip">
-                            Marca: {{ marca_actual }}
+                            Proveedor: {{ marca_actual }}
                             <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
                         </div>
                     {% endif %}
@@ -227,7 +227,7 @@
                                 {% else %}
                                     {{ grupo.nombre|slice:":2"|upper }}
                                 {% endif %}
-                                
+
                                 {% if grupo.cantidad > 1 %}
                                     <span class="badge-variantes">{{ grupo.cantidad }} variantes</span>
                                 {% endif %}
@@ -244,7 +244,7 @@
                                 {% if grupo.familia %}
                                     <span class="familia">{{ grupo.familia.descripcion }}</span>
                                 {% endif %}
-                                
+
                                 {% if grupo.descripcion_grupo %}
                                     <p class="desc-grupo">
                                         {{ grupo.descripcion_grupo }}

@@ -75,6 +75,7 @@ WSGI_APPLICATION = "pruebabd.wsgi.application"
 # --------------------------------------------------
 # Base de datos (Neon PostgreSQL)
 # --------------------------------------------------
+# --------------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -83,7 +84,18 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", cast=int),
-    }
+    },
+    "erp": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config("ERP_DB_NAME"),
+        "USER": config("ERP_DB_USER"),
+        "PASSWORD": config("ERP_DB_PASSWORD"),
+        "HOST": config("ERP_DB_HOST"),
+        "PORT": config("ERP_DB_PORT", cast=int, default=5432),
+        "OPTIONS": {
+            "options": "-c default_transaction_read_only=on",
+        },
+    },
 }
 # --------------------------------------------------
 # Validadores

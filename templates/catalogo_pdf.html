@@ -41,26 +41,15 @@
         .etiqueta-rastreo { position: absolute; left: 10px; color: #1c960c; font-size: 8pt; z-index: 0; }
         .texto-titulo { position: relative; z-index: 1; }
 
-        /* Estructura de página: las filas se empaquetan por espacio real en Python
-           (ver PASO 3 en generar_pdf.py), así que nunca quedan huecos horizontales.
-           SIN overflow:hidden a propósito: si una página excede el alto calculado,
-           el contenido se corre a una página física extra en vez de recortarse. */
         .pagina-productos {
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        /* Solo las páginas con suficiente contenido (>= UMBRAL_PAGINA_COMPLETA
-           unidades) se estiran para llenar la hoja completa. Las páginas "cola"
-           (pocos productos sueltos al final de una familia) quedan con su alto
-           natural, para no verse absurdamente estiradas. */
-        .pagina-productos.pagina-completa {
-            height: 238mm;
-        }
-
         .fila-productos {
             display: flex;
+            flex: 0 0 auto;
             gap: 6px;
             page-break-inside: avoid;
             break-inside: avoid;
@@ -87,10 +76,13 @@
         .grupo-titulo { font-size: 8.8pt; font-weight: bold; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.1px; line-height: 1.15; }
         .grupo-desc { font-size: 6.8pt; color: #475569; margin: 0; font-style: italic; }
 
-        /* Bloque de imagen: SIEMPRE el mismo tamaño (no crece ni se achica según la
-           página). La foto se ajusta adentro con object-fit: contain -> el marco
-           nunca cambia, solo la imagen se reduce si no cabe. */
-        .grupo-imagen-container { height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; overflow: hidden; }
+        /* Bloque de imagen: tamaño FIJO, más grande que antes, igual en TODAS las
+           tarjetas sin excepción. Nada de cálculos dinámicos ni negociación de
+           tamaño entre filas -- en Chromium 149 esos mecanismos (flex-grow,
+           min-height calculado) no se estaban aplicando de forma confiable. Un
+           bloque estático más grande no puede fallar de esa manera: cada tarjeta
+           mide más porque su imagen mide más, punto. */
+        .grupo-imagen-container { height: 180px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; overflow: hidden; }
         .grupo-imagen-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
 
         /* Badge de marca (proveedor): línea propia arriba del título, ya no se superpone */
@@ -182,15 +174,17 @@
 <div>
     {% for familia, paginas in familias.items %}
         {% for pagina in paginas %}
-        <div class="seccion-familia {% if forloop.first and forloop.parentloop.first and forloop.parentloop.parentloop.first %}primera-familia{% endif %}" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
+        <div class="seccion-familia {% if primera_familia_global|default_if_none:True and forloop.first and forloop.parentloop.first and forloop.parentloop.parentloop.first %}primera-familia{% endif %}" id="sec-{{ marca|slugify }}-{{ familia|slugify }}">
+            {% if forloop.first %}
             <div class="titulo-familia">
                 <span class="etiqueta-rastreo">[[sec-{{ marca|slugify }}-{{ familia|slugify }}]]</span>
                 <span class="texto-titulo">{{ marca }} - {{ familia }}</span>
             </div>
+            {% endif %}
 
-            <div class="pagina-productos {% if pagina.completa %}pagina-completa{% endif %}">
+            <div class="pagina-productos">
                 {% for fila in pagina.filas %}
-                <div class="fila-productos" style="flex: {{ fila.peso }} 1 auto;">
+                <div class="fila-productos">
                     {% for grupo_nombre, info in fila.items %}
                     <div class="grupo-tarjeta {% if info.es_destacado %}tarjeta-destacada-pdf{% endif %} {% if info.es_ancha %}tarjeta-ancha{% endif %}">
 
@@ -204,6 +198,9 @@
                                 </div>
                             {% endif %}
                         <h3 class="grupo-titulo">{{ grupo_nombre }}</h3>
+                        {% if info.descripcion %}
+                            <p class="grupo-desc">{{ info.descripcion }}</p>
+                        {% endif %}
 
                     </div>
 

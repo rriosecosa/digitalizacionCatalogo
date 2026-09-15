@@ -12,6 +12,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <style>
+        .th-sort-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .th-sort-link:hover { color: #2563eb; }
+        .th-sort-link i { font-size: 11px; }
+        .th-sort-link.activo { color: #2563eb; font-weight: 700; }
+    </style>
 </head>
 <body>
 
@@ -32,6 +45,12 @@
             <a href="{% url 'gestionar_grupos' %}" class="btn-dashboard" style="background-color: #2563eb; color: white; margin-right: 8px; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
     <i class="bi bi-diagram-3"></i> Administrar Agrupaciones
 </a>
+
+            {% if request.user.is_superuser %}
+            <a href="{% url 'sincronizar_productos' %}" class="btn-dashboard" style="background-color: #059669; color: white; margin-right: 8px; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+    <i class="bi bi-arrow-repeat"></i> Sincronizar Productos (ERP)
+</a>
+            {% endif %}
 
             <div class="dropdown">
                 <button type="button" class="btn-link btn-primario" onclick="toggleMenuPDFs(event)">
@@ -126,11 +145,51 @@
             <thead>
                 <tr>
                     <th style="width: 80px;">Imagen</th>
-                    <th style="width: 120px;">Código</th>
-                    <th>Producto / Grupo</th>
+                    <th style="width: 120px;">
+                        <a class="th-sort-link {% if orden_actual == 'codigo' %}activo{% endif %}"
+                           href="?{% if busqueda %}q={{ busqueda }}&{% endif %}orden=codigo&dir={% if orden_actual == 'codigo' and dir_actual == 'asc' %}desc{% else %}asc{% endif %}">
+                            Código
+                            {% if orden_actual == 'codigo' %}
+                                <i class="fas fa-sort-{% if dir_actual == 'asc' %}up{% else %}down{% endif %}"></i>
+                            {% else %}
+                                <i class="fas fa-sort" style="opacity:.3;"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a class="th-sort-link {% if orden_actual == 'producto' %}activo{% endif %}"
+                           href="?{% if busqueda %}q={{ busqueda }}&{% endif %}orden=producto&dir={% if orden_actual == 'producto' and dir_actual == 'asc' %}desc{% else %}asc{% endif %}">
+                            Producto / Grupo
+                            {% if orden_actual == 'producto' %}
+                                <i class="fas fa-sort-{% if dir_actual == 'asc' %}up{% else %}down{% endif %}"></i>
+                            {% else %}
+                                <i class="fas fa-sort" style="opacity:.3;"></i>
+                            {% endif %}
+                        </a>
+                    </th>
                     <th>Familia</th>
-                    <th>Proveedor</th>
-                    <th style="width: 120px; text-align: center;">Cód. Origen</th>
+                    <th>
+                        <a class="th-sort-link {% if orden_actual == 'proveedor' %}activo{% endif %}"
+                           href="?{% if busqueda %}q={{ busqueda }}&{% endif %}orden=proveedor&dir={% if orden_actual == 'proveedor' and dir_actual == 'asc' %}desc{% else %}asc{% endif %}">
+                            Proveedor
+                            {% if orden_actual == 'proveedor' %}
+                                <i class="fas fa-sort-{% if dir_actual == 'asc' %}up{% else %}down{% endif %}"></i>
+                            {% else %}
+                                <i class="fas fa-sort" style="opacity:.3;"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th style="width: 120px; text-align: center;">
+                        <a class="th-sort-link {% if orden_actual == 'origen' %}activo{% endif %}"
+                           href="?{% if busqueda %}q={{ busqueda }}&{% endif %}orden=origen&dir={% if orden_actual == 'origen' and dir_actual == 'asc' %}desc{% else %}asc{% endif %}">
+                            Cód. Origen
+                            {% if orden_actual == 'origen' %}
+                                <i class="fas fa-sort-{% if dir_actual == 'asc' %}up{% else %}down{% endif %}"></i>
+                            {% else %}
+                                <i class="fas fa-sort" style="opacity:.3;"></i>
+                            {% endif %}
+                        </a>
+                    </th>
                     {% if request.user.is_superuser %}
                     <th style="width: 100px; text-align: center;">Acciones</th>
                     {% endif %}
@@ -230,13 +289,13 @@
     <div class="paginacion">
         {# Botones para ir al Inicio y Anterior #}
         {% if page_obj.has_previous %}
-            <a href="?page=1{% if busqueda %}&q={{ busqueda }}{% endif %}" title="Primera página">« Inicio</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹ Anterior</a>
+            <a href="?page=1{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}" title="Primera página">« Inicio</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}">‹ Anterior</a>
         {% endif %}
 
         {# Muestra la página 1 si estamos lejos del inicio #}
         {% if page_obj.number > 3 %}
-            <a href="?page=1{% if busqueda %}&q={{ busqueda }}{% endif %}">1</a>
+            <a href="?page=1{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}">1</a>
             {% if page_obj.number > 4 %}
                 <span class="dots" style="padding: 8px 6px; color: var(--color-texto-suave); font-weight: 600;">...</span>
             {% endif %}
@@ -249,7 +308,7 @@
             {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
                 {% if num > 1 or page_obj.number <= 3 %}
                     {% if num < page_obj.paginator.num_pages or page_obj.number >= page_obj.paginator.num_pages|add:"-2" %}
-                        <a href="?page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ num }}</a>
+                        <a href="?page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}">{{ num }}</a>
                     {% endif %}
                 {% endif %}
             {% endif %}
@@ -260,13 +319,13 @@
             {% if page_obj.number < page_obj.paginator.num_pages|add:"-3" %}
                 <span class="dots" style="padding: 8px 6px; color: var(--color-texto-suave); font-weight: 600;">...</span>
             {% endif %}
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ page_obj.paginator.num_pages }}</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}">{{ page_obj.paginator.num_pages }}</a>
         {% endif %}
 
         {# Botones para Siguiente y Fin #}
         {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}">Siguiente ›</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if busqueda %}&q={{ busqueda }}{% endif %}" title="Última página">Fin ({{ page_obj.paginator.num_pages }}) »</a>
+            <a href="?page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}">Siguiente ›</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if orden_actual %}&orden={{ orden_actual }}&dir={{ dir_actual }}{% endif %}" title="Última página">Fin ({{ page_obj.paginator.num_pages }}) »</a>
         {% endif %}
     </div>
     {% endif %}
