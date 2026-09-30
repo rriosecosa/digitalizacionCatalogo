@@ -238,13 +238,15 @@
                                 {% for var in subgrupo.list %}
                                 <tr>
                                     <td class="col-codigo-real">{{ var.codigo|default:"---" }}</td>
-                                    <td class="col-ref">{{ var.codigo_de_origen|default:"---" }}</td>
-                                    <td class="col-medida">
-                                        {% if info.variantes|length > 1 %}
-                                            {{ var.medida_mostrar|default:"--" }}
+                                    <td class="col-ref">
+                                        {% if var.url_ficha_tecnica %}
+                                            <a href="{{ var.url_ficha_tecnica }}" style="color:#1c960c; text-decoration:underline;">{{ var.codigo_de_origen|default:"---" }}</a>
                                         {% else %}
-                                            --
+                                            {{ var.codigo_de_origen|default:"---" }}
                                         {% endif %}
+                                    </td>
+                                    <td class="col-medida">
+                                        {{ var.medida_mostrar|default:"--" }}
                                     </td>
                                     {% if info.tiene_empaque_inner %}
                                         <td class="col-inner">{{ var.empaque_inner|default:"-" }}</td>

@@ -26,6 +26,7 @@
         .input-text:focus { border-color: #2563eb; outline: 2px solid #93c5fd; background-color: #fff; }
         .input-subgrupo { background-color: #f8fafc; border-color: #94a3b8; color: #0f172a; }
         .input-limpio { background-color: #f0fdf4; border-color: #86efac; font-weight: 600; color: #166534; }
+        .input-super { background-color: #eef2ff; border-color: #a5b4fc; font-weight: 600; color: #3730a3; }
         .input-orden { width: 60px; text-align: center; font-weight: 700; background-color: #fffbeb; border-color: #fde68a; color: #92400e; }
         .input-etiqueta { width: 90px; text-align: center; font-weight: 700; text-transform: uppercase; background-color: #fefce8; border-color: #fef08a; color: #854d0e; }
         .destacado-box { display: flex; align-items: center; justify-content: center; gap: 4px; }
@@ -52,12 +53,19 @@
         {% endfor %}
     </datalist>
 
+    <datalist id="lista-super-grupos-existentes">
+        {% for sg in todos_los_super_grupos %}
+            <option value="{{ sg }}">
+        {% endfor %}
+    </datalist>
+
     <div class="container">
         <div class="header">
             <div>
                 <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Gestión de Nombres, Grupos, Subgrupos y Posición</h1>
                 <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
                     Asigna <strong>Subgrupos</strong> para dividir variantes (ej. Bolsa 10 Unidades) dentro de una misma tarjeta en el PDF.
+                    Asigna un <strong>Súper Grupo</strong> (ej. "MARTILLOS") para que varios grupos relacionados de la misma familia queden juntos en el PDF.
                 </p>
             </div>
             <div class="header-actions">
@@ -86,14 +94,15 @@
                     <thead>
                         <tr>
                             <th style="width: 75px;">Código</th>
-                            <th style="width: 210px;">Descripción ERP</th>
-                            <th style="width: 80px;">Marca</th>
-                            <th style="width: 200px;">Grupo Asignado</th>
-                            <th style="width: 170px;">Subgrupo (Opcional)</th>
-                            <th style="width: 160px;">Medida (PDF)</th>
-                            <th style="width: 65px; text-align: center;">Posición</th>
-                            <th style="width: 65px; text-align: center;">¿Destacar?</th>
-                            <th style="width: 95px; text-align: center;">Etiqueta</th>
+                            <th style="width: 190px;">Descripción ERP</th>
+                            <th style="width: 75px;">Marca</th>
+                            <th style="width: 180px;">Grupo Asignado</th>
+                            <th style="width: 150px;">Subgrupo (Opcional)</th>
+                            <th style="width: 150px;">Medida (PDF)</th>
+                            <th style="width: 150px;">Súper Grupo (Opcional)</th>
+                            <th style="width: 60px; text-align: center;">Posición</th>
+                            <th style="width: 60px; text-align: center;">¿Destacar?</th>
+                            <th style="width: 90px; text-align: center;">Etiqueta</th>
                             <th style="width: 100px; text-align: center;">Acción</th>
                         </tr>
                     </thead>
@@ -105,21 +114,21 @@
                                 <input type="hidden" name="producto_id[]" value="{{ p.id }}">
                             </td>
                             <td>
-                                <input 
-                                    type="text" 
-                                    name="nueva_descripcion[]" 
-                                    class="input-text campo-desc-{{ p.id }}" 
+                                <input
+                                    type="text"
+                                    name="nueva_descripcion[]"
+                                    class="input-text campo-desc-{{ p.id }}"
                                     value="{{ p.descripcion|default:'' }}"
                                     placeholder="Descripción general..."
                                 >
                             </td>
                             <td>{{ p.proveedor.marca|default:"--" }}</td>
                             <td>
-                                <input 
-                                    type="text" 
-                                    name="nuevo_grupo[]" 
-                                    class="input-text campo-grupo-{{ p.id }}" 
-                                    list="lista-grupos-existentes" 
+                                <input
+                                    type="text"
+                                    name="nuevo_grupo[]"
+                                    class="input-text campo-grupo-{{ p.id }}"
+                                    list="lista-grupos-existentes"
                                     value="{{ p.grupo_activo }}"
                                     placeholder="Grupo principal..."
                                     autocomplete="off"
@@ -129,19 +138,19 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <input 
-                                    type="text" 
-                                    name="nuevo_subgrupo[]" 
-                                    class="input-text input-subgrupo campo-subgrupo-{{ p.id }}" 
+                                <input
+                                    type="text"
+                                    name="nuevo_subgrupo[]"
+                                    class="input-text input-subgrupo campo-subgrupo-{{ p.id }}"
                                     value="{{ p.subgrupo_activo|default:'' }}"
                                     placeholder="Ej: Bolsa 10 Unidades"
                                 >
                             </td>
                             <td>
-                                <input 
-                                    type="text" 
-                                    name="nuevo_nombre_limpio[]" 
-                                    class="input-text input-limpio campo-limpio-{{ p.id }}" 
+                                <input
+                                    type="text"
+                                    name="nuevo_nombre_limpio[]"
+                                    class="input-text input-limpio campo-limpio-{{ p.id }}"
                                     value="{{ p.nombre_limpio }}"
                                     placeholder="Medida o variante..."
                                 >
@@ -149,48 +158,59 @@
                                     <span class="badge-limpio-manual">★ Editado</span>
                                 {% endif %}
                             </td>
+                            <td>
+                                <input
+                                    type="text"
+                                    name="nuevo_super_grupo[]"
+                                    class="input-text input-super campo-super-{{ p.id }}"
+                                    list="lista-super-grupos-existentes"
+                                    value="{{ p.super_grupo|default:'' }}"
+                                    placeholder="Ej: MARTILLOS"
+                                    autocomplete="off"
+                                >
+                            </td>
                             <td style="text-align: center;">
-                                <input 
-                                    type="number" 
-                                    name="orden_grupo[]" 
-                                    class="input-text input-orden campo-orden-{{ p.id }}" 
+                                <input
+                                    type="number"
+                                    name="orden_grupo[]"
+                                    class="input-text input-orden campo-orden-{{ p.id }}"
                                     value="{{ p.orden_grupo|default:0 }}"
                                     min="0"
                                 >
                             </td>
                             <td style="text-align: center;">
                                 <div class="destacado-box">
-                                    <input 
-                                        type="checkbox" 
-                                        name="es_destacado[]" 
-                                        value="{{ p.id }}" 
+                                    <input
+                                        type="checkbox"
+                                        name="es_destacado[]"
+                                        value="{{ p.id }}"
                                         class="campo-destacado-{{ p.id }}"
                                         {% if p.es_destacado %}checked{% endif %}
                                     >
                                 </div>
                             </td>
                             <td style="text-align: center;">
-                                <input 
-                                    type="text" 
-                                    name="etiqueta_destacado[]" 
-                                    class="input-text input-etiqueta campo-etiqueta-{{ p.id }}" 
+                                <input
+                                    type="text"
+                                    name="etiqueta_destacado[]"
+                                    class="input-text input-etiqueta campo-etiqueta-{{ p.id }}"
                                     value="{{ p.etiqueta_destacado|default:'OFERTA' }}"
                                 >
                             </td>
                             <td style="text-align: center;">
                                 <div class="acciones-fila">
-                                    <button 
-                                        type="button" 
-                                        class="btn-guardar-indiv" 
+                                    <button
+                                        type="button"
+                                        class="btn-guardar-indiv"
                                         onclick="guardarIndividual('{{ p.id }}');"
                                     >
                                         Guardar
                                     </button>
                                     {% if p.grupo_manual or p.nombre_limpio_es_manual or p.orden_grupo > 0 or p.es_destacado %}
-                                        <button 
-                                            type="submit" 
-                                            form="form-restaurar-{{ p.id }}" 
-                                            class="btn-restaurar" 
+                                        <button
+                                            type="submit"
+                                            form="form-restaurar-{{ p.id }}"
+                                            class="btn-restaurar"
                                             title="Restaurar valores automáticos"
                                             onclick="return confirm('¿Restaurar producto {{ p.codigo }}?');"
                                         >
@@ -202,7 +222,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">No se encontraron productos.</td>
+                            <td colspan="11" style="text-align: center; padding: 24px; color: #94a3b8;">No se encontraron productos.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -223,6 +243,7 @@
                 <input type="hidden" name="nuevo_grupo_individual" id="indiv_grupo">
                 <input type="hidden" name="nuevo_subgrupo_individual" id="indiv_subgrupo">
                 <input type="hidden" name="nuevo_nombre_limpio_individual" id="indiv_limpio">
+                <input type="hidden" name="nuevo_super_grupo_individual" id="indiv_super">
                 <input type="hidden" name="orden_grupo_individual" id="indiv_orden">
                 <input type="hidden" name="es_destacado_individual" id="indiv_destacado">
                 <input type="hidden" name="etiqueta_destacado_individual" id="indiv_etiqueta">
@@ -257,6 +278,7 @@
             const grupo = document.querySelector('.campo-grupo-' + productoId).value;
             const subgrupo = document.querySelector('.campo-subgrupo-' + productoId).value;
             const limpio = document.querySelector('.campo-limpio-' + productoId).value;
+            const superGrupo = document.querySelector('.campo-super-' + productoId).value;
             const orden = document.querySelector('.campo-orden-' + productoId).value;
             const esDestacado = document.querySelector('.campo-destacado-' + productoId).checked ? '1' : '0';
             const etiqueta = document.querySelector('.campo-etiqueta-' + productoId).value;
@@ -266,6 +288,7 @@
             document.getElementById('indiv_grupo').value = grupo;
             document.getElementById('indiv_subgrupo').value = subgrupo;
             document.getElementById('indiv_limpio').value = limpio;
+            document.getElementById('indiv_super').value = superGrupo;
             document.getElementById('indiv_orden').value = orden;
             document.getElementById('indiv_destacado').value = esDestacado;
             document.getElementById('indiv_etiqueta').value = etiqueta;

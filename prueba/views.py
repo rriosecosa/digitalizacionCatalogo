@@ -1,5 +1,6 @@
 from collections import OrderedDict, Counter
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 import time
 import os
 import base64
@@ -29,7 +30,7 @@ from playwright.async_api import async_playwright
 import asyncio
 import fitz  # PyMuPDF
 logger = logging.getLogger(__name__)
-from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes, ProductoGrupoManual, SyncLog
+from .models import FamiliaProducto, Producto, ImagenProducto, Proveedor, VistaProductoAgrupado, CatalogCache, VistaProductoVariantes, ProductoGrupoManual, SyncLog, TruperFichaTecnica
 from .sync_erp_service import ejecutar_sync
 
 # ==========================================
@@ -69,6 +70,31 @@ def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_orige
     if not nombre_grupo or not descripcion_variante:
         return "--"
 
+    # NOTA (Claude): cuando un producto NO pertenece a ningún grupo real
+    # (es un "grupo de 1"), el nombre de grupo que llega a esta función es
+    # exactamente igual a su propia descripción -- ver
+    # _construir_grupos_efectivos_dashboard() y generar_pdf():
+    # grupo_final = override_item.grupo_personalizado if override_item else
+    # (p.descripcion_grupo or p.descripcion). Si el producto no tiene
+    # descripcion_grupo (no quedó agrupado con nadie más por el SQL) ni
+    # override manual, "grupo_final" termina siendo p.descripcion misma.
+    # Antes, en ese caso, esta función intentaba "restar" el nombre del
+    # grupo a la descripción de la variante -- pero como son el mismo
+    # texto, la resta daba vacío y el producto quedaba sin medida ("--").
+    #
+    # Para este caso solo se confía en la FASE 1 (el patrón de medida
+    # explícito: números + unidad, ej. "16OZ", "1/4\""), que es preciso.
+    # La FASE 2 (heurístico de "restar palabras del grupo y quedarse con
+    # lo que sobra") depende de tener un nombre de grupo genérico real
+    # contra el cual comparar -- sin eso, adivina y a veces se equivoca
+    # (Rodrigo prefiere cargar la medida a mano en Gestionar Agrupaciones
+    # para esos casos en vez de mostrar un valor incierto). Por eso, si la
+    # FASE 1 no encuentra nada para un producto sin grupo real, se corta
+    # ahí y se devuelve "--" en vez de seguir a la FASE 2.
+    es_producto_sin_grupo_real = (
+        str(nombre_grupo).strip().upper() == str(descripcion_variante).strip().upper()
+    )
+
     nombre_grupo_str = str(nombre_grupo).strip().upper()
     descripcion_limpia = str(descripcion_variante).strip().upper()
 
@@ -93,7 +119,7 @@ def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_orige
     # ---------------------------------------------------------
     patron_medidas = r'(?<!\d)\d+(?:/\d+)?\s*(?:"|MM|CM|M|OZ|KG|GR|PULG|LB|LT|L|ML|GAL|W|V|A|HP|DTES\.?|DIENTES)(?!\w)'
 
-    medidas_grupo = set(re.findall(patron_medidas, nombre_grupo_str))
+    medidas_grupo = set() if es_producto_sin_grupo_real else set(re.findall(patron_medidas, nombre_grupo_str))
 
     medidas_variante = []
     for match in re.finditer(patron_medidas, descripcion_limpia):
@@ -103,6 +129,9 @@ def extraer_medida(nombre_grupo: str, descripcion_variante: str, codigo_de_orige
 
     if medidas_variante:
         return " ".join(medidas_variante)
+
+    if es_producto_sin_grupo_real:
+        return "--"
 
     # ---------------------------------------------------------
     # FASE 2: DICCIONARIO Y RESTA (Si NO es un producto de medida numérica)
@@ -235,14 +264,225 @@ def limpiar_pdfs_huerfanos(sin_precio):
             except OSError as e:
                 logger.warning(f"[limpieza catalogos] No se pudo eliminar {nombre_archivo}: {e}")
 
+
+def _eliminar_catalogo_mas_antiguo_si_corresponde(catalogos_existentes):
+    """
+    NOTA (Claude): antes esto vivía duplicado e inline en generar_pdf() y en
+    _ejecutar_generacion_pdf_en_hilo(), y elegía SIEMPRE el catálogo más
+    antiguo del tipo (con/sin precio) vía catalogos_existentes.first(), sin
+    mirar si ese catálogo estaba marcado como vigente (is_current=True) en
+    "Marcar como vigente" del historial. Eso significa que, si alguien fijaba
+    como oficial justo la versión más antigua guardada, la siguiente
+    generación de un catálogo del mismo tipo la borraba igual -- perdiendo el
+    archivo que estaba vigente.
+
+    Ahora: se sigue usando el mismo umbral (3 o más versiones guardadas de
+    ese tipo) para decidir SI hay que liberar espacio, pero al elegir CUÁL
+    borrar se excluyen los catálogos vigentes (.exclude(is_current=True)) y
+    se toma el más antiguo entre los que quedan. Si no queda ninguno
+    borrable (por ejemplo, las 3 versiones guardadas están todas vigentes,
+    lo cual no debería pasar en la práctica ya que solo puede haber un
+    vigente por tipo, pero se cubre por seguridad), no se borra nada esta
+    vez.
+
+    `catalogos_existentes` debe venir ya filtrado por tipo (con/sin precio)
+    y ordenado por version_number ascendente, igual que antes.
+
+    Devuelve el objeto CatalogCache eliminado, o None si no se eliminó
+    ninguno.
+    """
+    if catalogos_existentes.count() < 3:
+        return None
+
+    catalogo_mas_antiguo = catalogos_existentes.exclude(is_current=True).first()
+    if not catalogo_mas_antiguo:
+        logger.info(
+            "[limpieza catalogos] Se alcanzó el umbral de 3 versiones, pero todas las "
+            "candidatas a borrado están marcadas como vigentes -- no se borra ninguna."
+        )
+        return None
+
+    if catalogo_mas_antiguo.pdf_file:
+        ruta_fisica = catalogo_mas_antiguo.pdf_file.path
+        catalogo_mas_antiguo.pdf_file.delete(save=False)
+        if os.path.exists(ruta_fisica):
+            logger.warning(f"[limpieza catalogos] El archivo {ruta_fisica} no se eliminó del disco (delete silencioso).")
+    catalogo_mas_antiguo.delete()
+
+    return catalogo_mas_antiguo
+
+def _agrupar_por_super_grupo(grupos_items):
+    """
+    NOTA (Claude): recibe una lista de tuplas (nombre_grupo, info) ya con
+    'posicion_fija', 'variantes', 'prefijo_nombre', 'min_codigo_prod' y
+    'min_codigo_str' calculados (se usan exactamente igual que antes para
+    ordenar), y le agrega el "Súper Grupo": una agrupación opcional,
+    asignada en Gestionar Agrupaciones y guardada en
+    ImagenProducto.super_grupo (NO en ProductoGrupoManual, para no tocar
+    las agrupaciones manuales existentes), que sirve para juntar varios
+    grupos relacionados dentro de una misma familia (ej. que todos los
+    "martillos" queden juntos aunque tengan distinta cantidad de
+    variantes).
+
+    Se arman "clusters": todos los grupos con el mismo super_grupo quedan
+    en un mismo cluster, y cada grupo sin super_grupo asignado forma su
+    propio cluster de 1 (para no cambiar su comportamiento actual). Cada
+    cluster se posiciona usando el menor "orden individual" de sus
+    miembros, y dentro del cluster los miembros se ordenan entre sí con
+    ese mismo criterio -- así se conserva la lógica estética de orden por
+    cantidad de variantes que ya estaba afinada, sólo que ahora los
+    grupos relacionados quedan adyacentes.
+    """
+    def clave_individual(info):
+        return (
+            info['posicion_fija'],
+            len(info['variantes']),
+            info['prefijo_nombre'],
+            info['min_codigo_prod'],
+            info['min_codigo_str'],
+        )
+
+    clusters = OrderedDict()
+    for nombre_g, info in grupos_items:
+        super_grupo = info.get('super_grupo')
+        clave_cluster = super_grupo if super_grupo else f"__sin_super_grupo__{nombre_g}"
+        clusters.setdefault(clave_cluster, []).append((nombre_g, info))
+
+    lista_clusters = []
+    for miembros in clusters.values():
+        miembros_ordenados = sorted(miembros, key=lambda item: clave_individual(item[1]))
+        clave_min = min(clave_individual(info) for _, info in miembros_ordenados)
+        lista_clusters.append((clave_min, miembros_ordenados))
+
+    lista_clusters.sort(key=lambda c: c[0])
+
+    resultado = []
+    for _, miembros_ordenados in lista_clusters:
+        resultado.extend(miembros_ordenados)
+
+    return resultado
+
+
+def _construir_grupos_efectivos_dashboard():
+    """
+    NOTA (Claude): esto reemplaza por completo el enfoque anterior de
+    dashboard_productos (que partía de VistaProductoAgrupado, una fila
+    por cluster automático de SQL keyeada por el _id mínimo del cluster,
+    ciega a ProductoGrupoManual). Ese enfoque tenía un límite real que un
+    primer parche (basado en "override más frecuente dentro del cluster")
+    no podía resolver: cuando un cluster automático se DIVIDE a propósito
+    en Gestionar Agrupaciones en dos o más grupos manuales distintos (ej.
+    43-02-102 -> "3104 - HOJA SIERRA CALADORA..." y 43-02-104 -> "3103 -
+    HOJA SIERRA CALADORA...", que el SQL agrupaba juntos por descripción
+    automática pero son productos con medidas distintas), una sola fila
+    de VistaProductoAgrupado no puede representar dos grupos separados.
+
+    Por eso ahora se arma igual que generar_pdf/gestionar_grupos: se
+    recorre VistaProductoVariantes (una fila por SKU, la misma fuente que
+    ya usa Gestionar Agrupaciones), se resuelve el grupo EFECTIVO de cada
+    variante (su override individual en ProductoGrupoManual si existe, si
+    no el nombre automático descripcion_grupo/descripcion), y se agrupan
+    en Python por ese nombre efectivo. Un cluster dividido en dos grupos
+    manuales aparece ahora como dos filas, exactamente como en Gestionar
+    Agrupaciones -- no una sola fila con un nombre "ganador" arbitrario.
+
+    Cada grupo efectivo devuelve un "representante" (la variante de menor
+    código dentro del grupo) para los campos que se muestran en una sola
+    fila (código, código de origen, familia, marca). El id de ese
+    representante es el _id real de una variante concreta (existe en la
+    tabla `producto`), así que el botón "Modificar" del dashboard --que
+    llama a editar_producto y actualiza Producto.objects.filter(field_id=...)
+    y el ImagenProducto por nombre de grupo-- sigue funcionando igual que
+    antes; dashboard.html no depende de que ese id exista en
+    VistaProductoAgrupado.
+
+    Costo: a diferencia del enfoque anterior (paginado a nivel SQL sobre
+    VistaProductoAgrupado), esto carga TODAS las variantes filtradas en
+    memoria en cada request para poder agruparlas correctamente -- mismo
+    patrón que ya usa lista_productos (el catálogo público) hoy. Si con
+    el volumen real de productos esto se siente lento, se puede optimizar
+    después (ej. cacheando el resultado agrupado unos minutos), pero
+    prioricé que el dashboard muestre exactamente lo mismo que Gestionar
+    Agrupaciones.
+    """
+    overrides_dict = {
+        item.producto_id: item.grupo_personalizado
+        for item in ProductoGrupoManual.objects.all()
+    }
+
+    variantes_qs = VistaProductoVariantes.objects.select_related("proveedor").exclude(
+        Q(descripcion__isnull=True) |
+        Q(descripcion__exact='') |
+        Q(descripcion__startswith='(') |
+        Q(descripcion__istartswith='tee') |
+        Q(descripcion__regex=r'^.$') |
+        Q(proveedor__marca__startswith='*') |
+        Q(proveedor__marca__startswith='"') |
+        Q(proveedor__marca__iexact='a') |
+        Q(proveedor__marca__iexact='KAISER - HEISSNER') |
+        Q(proveedor__marca__iexact='HELA') |
+        Q(codigo='17-27-105') |
+        Q(descripcion__iexact='ANULA FACTURA') |
+        Q(descripcion__iexact='BOLSA')
+    )
+
+    grupos = OrderedDict()
+    for v in variantes_qs:
+        grupo_nombre = overrides_dict.get(v.id) or (v.descripcion_grupo or v.descripcion)
+        grupos.setdefault(grupo_nombre, []).append(v)
+
+    lista_grupos = []
+    for grupo_nombre, variantes in grupos.items():
+        representante = min(variantes, key=lambda v: (v.codigo or ""))
+
+        marcas = [v.proveedor.marca for v in variantes if getattr(v, 'proveedor', None) and v.proveedor.marca]
+        marca_predominante = (
+            Counter(marcas).most_common(1)[0][0] if marcas
+            else (representante.proveedor.marca if representante.proveedor else "")
+        )
+
+        lista_grupos.append({
+            "id": representante.id,
+            "codigo": representante.codigo,
+            "codigo_de_origen": representante.codigo_de_origen,
+            "grupo_nombre": grupo_nombre,
+            "descripcion_grupo_original": representante.descripcion_grupo or representante.descripcion,
+            "familia_nombre": representante.familia_nombre,
+            "proveedor_marca": marca_predominante,
+            "unidad_medida": representante.unidad_medida,
+            "cantidad": len(variantes),
+            "codigos_variantes": [v.codigo for v in variantes if v.codigo],
+            "codigos_origen_variantes": [v.codigo_de_origen for v in variantes if v.codigo_de_origen],
+        })
+
+    return lista_grupos
+
 # ==========================================
 # VISTA: LISTA DE PRODUCTOS (CATÁLOGO PÚBLICO)
 # ==========================================
+
+# Opciones de cantidad de productos por página que el usuario puede elegir
+# en el catálogo público (selector en productos.html). Si en la URL viene
+# un "por_pagina" que no está en esta lista (o algo no numérico, ej.
+# alguien editando el querystring a mano), se usa el valor por defecto en
+# vez de fallar o de permitir un número arbitrario.
+OPCIONES_POR_PAGINA_CATALOGO = [12, 24, 48, 96]
+POR_PAGINA_DEFAULT_CATALOGO = 12
+
+
 @never_cache
 def lista_productos(request):
     familia_seleccionada = request.GET.get("familia", "").strip()
     marca_seleccionada = request.GET.get("marca", "").strip()
     texto_busqueda = request.GET.get("q", "").strip()
+
+    try:
+        por_pagina = int(request.GET.get("por_pagina", POR_PAGINA_DEFAULT_CATALOGO))
+    except (TypeError, ValueError):
+        por_pagina = POR_PAGINA_DEFAULT_CATALOGO
+
+    if por_pagina not in OPCIONES_POR_PAGINA_CATALOGO:
+        por_pagina = POR_PAGINA_DEFAULT_CATALOGO
 
     familias = {f.codigo: f for f in FamiliaProducto.objects.all()}
 
@@ -400,7 +640,7 @@ def lista_productos(request):
     marcas_sidebar = [{"nombre": nombre, "total": total} for nombre, total in conteo_marcas.items()]
     marcas_sidebar.sort(key=lambda x: x["nombre"])
 
-    paginator = Paginator(lista_grupos, 12)
+    paginator = Paginator(lista_grupos, por_pagina)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
 
@@ -415,6 +655,8 @@ def lista_productos(request):
             "familia_actual": familia_seleccionada,
             "marca_actual": marca_seleccionada,
             "busqueda": texto_busqueda,
+            "por_pagina_actual": por_pagina,
+            "opciones_por_pagina": OPCIONES_POR_PAGINA_CATALOGO,
         },
     )
 
@@ -486,6 +728,20 @@ def detalle_producto(request, producto_id):
         else:
             v.nombre_limpio = extraer_medida(nombre_grupo, v.descripcion or "", v.codigo_de_origen or "")
 
+    # NOTA (Claude): mismo cruce que ya usa generar_pdf() para la columna
+    # "Ref" del PDF -- fichas técnicas de Truper cacheadas por
+    # codigo_de_origen (ver comando "sync_fichas_truper" y modelo
+    # TruperFichaTecnica). Rodrigo pidió mostrar este link también en el
+    # catálogo público (detalle.html), no solo en el PDF. No se consulta a
+    # truper.com en vivo, se usa la cache ya sincronizada -- igual que en
+    # el PDF.
+    fichas_truper_dict = {
+        item.codigo_origen: item.url_ficha_tecnica
+        for item in TruperFichaTecnica.objects.all()
+    }
+    for v in variantes:
+        v.url_ficha_tecnica = fichas_truper_dict.get(v.codigo_de_origen) if v.codigo_de_origen else None
+
     return render(
         request,
         "detalle.html",
@@ -502,20 +758,30 @@ def detalle_producto(request, producto_id):
 # ==========================================
 # VISTA: PANEL DASHBOARD PRINCIPAL
 # ==========================================
-COLUMNAS_ORDENABLES_DASHBOARD = {
-    "codigo": ["codigo"],
-    "producto": ["descripcion_grupo", "descripcion"],
-    "proveedor": ["proveedor__marca"],
-    "origen": ["codigo_de_origen"],
-}
-
-
 @never_cache
 @login_required(login_url='/login/')
 def dashboard_productos(request):
     texto_busqueda = request.GET.get("q", "").strip()
 
-    productos_base_qs = VistaProductoAgrupado.objects.exclude(
+    # NOTA (Claude): lista_grupos ya viene armada por GRUPO EFECTIVO (ver
+    # _construir_grupos_efectivos_dashboard), no por cluster automático de
+    # SQL -- así coincide siempre con lo que muestra Gestionar Agrupaciones,
+    # incluso cuando un cluster automático fue dividido a mano en varios
+    # grupos manuales.
+    lista_grupos = _construir_grupos_efectivos_dashboard()
+
+    # Los KPIs se calculan sobre el total SIN filtrar por busqueda, igual
+    # que antes (productos_base_qs no se filtraba por texto_busqueda).
+    kpi_productos_activos = len(lista_grupos)
+
+    # NOTA (Claude): conteo "en bruto" pedido por Rodrigo -- cada SKU/
+    # variante individual cuenta por separado, SIN agrupar por nombre de
+    # grupo efectivo (a diferencia de kpi_productos_activos, que cuenta
+    # grupos). Mismos filtros de exclusión que usa
+    # _construir_grupos_efectivos_dashboard, aplicados directo sobre
+    # VistaProductoVariantes con .count() -- no toca lista_grupos ni la
+    # tabla/paginación del dashboard, es solo un dato informativo extra.
+    kpi_productos_activos_bruto = VistaProductoVariantes.objects.exclude(
         Q(descripcion__isnull=True) |
         Q(descripcion__exact='') |
         Q(descripcion__startswith='(') |
@@ -529,102 +795,85 @@ def dashboard_productos(request):
         Q(codigo='17-27-105') |
         Q(descripcion__iexact='ANULA FACTURA') |
         Q(descripcion__iexact='BOLSA')
-    )
+    ).count()
 
-    kpi_productos_activos = productos_base_qs.count()
     kpi_familias_activas = FamiliaProducto.objects.count()
-    kpi_proveedores = productos_base_qs.values("proveedor__marca").distinct().exclude(proveedor__marca="").count()
+    kpi_proveedores = len({g["proveedor_marca"] for g in lista_grupos if g["proveedor_marca"]})
+    # NOTA (Claude): igual que en el código original, no existe un campo
+    # "fecha_creacion" en las vistas SQL actuales (VistaProductoAgrupado
+    # tampoco lo tenía declarado en models.py), así que esto ya devolvía
+    # siempre 0 antes del cambio -- se preserva el mismo comportamiento.
+    kpi_nuevos_6_meses = 0
 
-    hace_seis_meses = datetime.now() - timedelta(days=180)
-    try:
-        kpi_nuevos_6_meses = productos_base_qs.filter(fecha_creacion__gte=hace_seis_meses).count()
-    except Exception:
-        kpi_nuevos_6_meses = 0
+    if texto_busqueda:
+        # NOTA (Claude): ya no hace falta el cruce manual con
+        # VistaProductoVariantes ni con ProductoGrupoManual para "encontrar
+        # el grupo por código de variante" o "por nombre de grupo manual"
+        # -- cada grupo efectivo ya trae su nombre YA resuelto y los
+        # códigos de TODAS sus variantes, así que buscar por cualquiera de
+        # esos códigos encuentra directamente el grupo correcto.
+        def _coincide(grupo, termino_l):
+            if termino_l in str(grupo["grupo_nombre"] or "").lower():
+                return True
+            if termino_l in str(grupo["descripcion_grupo_original"] or "").lower():
+                return True
+            if termino_l in str(grupo["proveedor_marca"] or "").lower():
+                return True
+            if any(termino_l in str(c or "").lower() for c in grupo["codigos_variantes"]):
+                return True
+            if any(termino_l in str(c or "").lower() for c in grupo["codigos_origen_variantes"]):
+                return True
+            return False
 
-    productos_qs = productos_base_qs.select_related("proveedor")
+        for termino in texto_busqueda.split():
+            termino_l = termino.lower()
+            lista_grupos = [g for g in lista_grupos if _coincide(g, termino_l)]
 
     orden_actual = request.GET.get("orden", "")
     dir_actual = request.GET.get("dir", "asc")
 
-    if orden_actual in COLUMNAS_ORDENABLES_DASHBOARD:
-        campos = COLUMNAS_ORDENABLES_DASHBOARD[orden_actual]
-        if dir_actual == "desc":
-            campos = [f"-{c}" for c in campos]
-        productos_qs = productos_qs.order_by(*campos)
-    else:
-        orden_actual = ""
-        productos_qs = productos_qs.order_by("descripcion")
-
-    if texto_busqueda:
-        terminos = texto_busqueda.split()
-        for termino in terminos:
-            # NOTA (Claude): la vista agrupada solo guarda UN codigo
-            # "representante" por grupo (el menor, via min(p.codigo)).
-            # Si el usuario busca el codigo de una variante que quedo
-            # "absorbida" dentro de un grupo con otro representante
-            # (ej. busca 17-01-102 pero el grupo aparece como
-            # 17-01-100), la busqueda directa por codigo/codigo_de_origen
-            # no la encuentra. Por eso buscamos tambien en
-            # VistaProductoVariantes (que SI tiene cada codigo individual)
-            # y traemos el descripcion_grupo correspondiente -- mismo
-            # truco que ya usa lista_productos.
-            grupos_por_variante = list(
-                VistaProductoVariantes.objects.filter(
-                    Q(codigo__icontains=termino) |
-                    Q(codigo_de_origen__icontains=termino)
-                ).values_list('descripcion_grupo', flat=True).distinct()
-            )
-
-            # NOTA (Claude): el buscador tampoco encontraba productos por el
-            # nombre de grupo asignado a mano en "Gestionar Agrupaciones"
-            # (ProductoGrupoManual.grupo_personalizado) -- ej. buscar
-            # "FRESA" no encontraba "FRESA RECTA 2 FILOS" porque ese nombre
-            # no tiene relacion textual con la descripcion original del ERP
-            # ("BROCA ROUTER RECTA FILOS MEDIANA"). Usamos el mismo id (p.id)
-            # que despues usa overrides_dict.get(p.id, ...) para que quede
-            # consistente con como se resuelve el nombre mostrado.
-            ids_por_grupo_manual = list(
-                ProductoGrupoManual.objects.filter(
-                    grupo_personalizado__icontains=termino
-                ).values_list('producto_id', flat=True)
-            )
-
-            productos_qs = productos_qs.filter(
-                Q(descripcion__icontains=termino) |
-                Q(descripcion_grupo__icontains=termino) |
-                Q(codigo__icontains=termino) |
-                Q(codigo_de_origen__icontains=termino) |
-                Q(proveedor__marca__icontains=termino) |
-                Q(descripcion_grupo__in=grupos_por_variante) |
-                Q(id__in=ids_por_grupo_manual)
-            )
-
-    # 1. Obtener overrides manuales
-    overrides_dict = {
-        item.producto_id: item.grupo_personalizado
-        for item in ProductoGrupoManual.objects.all()
+    claves_orden = {
+        "codigo": lambda g: (g["codigo"] or ""),
+        "producto": lambda g: (g["grupo_nombre"] or ""),
+        "proveedor": lambda g: (g["proveedor_marca"] or ""),
+        "origen": lambda g: (g["codigo_de_origen"] or ""),
     }
 
-    # 2. Paginación directa
-    paginator = Paginator(productos_qs, 20)
+    if orden_actual in claves_orden:
+        lista_grupos.sort(key=claves_orden[orden_actual], reverse=(dir_actual == "desc"))
+    else:
+        orden_actual = ""
+        lista_grupos.sort(key=lambda g: (g["grupo_nombre"] or ""))
+
+    paginator = Paginator(lista_grupos, 20)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
 
-    # 3. Cruzar con ImagenProducto sin borrar descripcion_grupo original si no existe personalizada
-    nombres_grupos = [overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion) for p in page_obj.object_list]
-    nombres_grupos_norm = [str(n).strip().upper() for n in nombres_grupos if n]
+    nombres_grupos_norm = [str(g["grupo_nombre"]).strip().upper() for g in page_obj.object_list if g["grupo_nombre"]]
     info_grupos_qs = ImagenProducto.objects.filter(grupo_nombre__in=nombres_grupos_norm)
 
     imagenes_dict = {str(img.grupo_nombre).strip().upper(): img.imagen.url for img in info_grupos_qs if img.imagen}
     descripciones_dict = {str(img.grupo_nombre).strip().upper(): img.descripcion for img in info_grupos_qs if img.descripcion}
 
-    for p in page_obj.object_list:
-        grupo_nombre = overrides_dict.get(p.id, p.descripcion_grupo or p.descripcion)
-        grupo_nombre_norm = str(grupo_nombre).strip().upper() if grupo_nombre else ""
-        p.imagen_url = imagenes_dict.get(grupo_nombre_norm, None)
-        p.descripcion_grupo = descripciones_dict.get(grupo_nombre_norm, p.descripcion_grupo or "")
-        p.grupo_nombre = grupo_nombre
-        p.field_id = p.id
+    # NOTA (Claude): dashboard.html no depende de que estas filas sean
+    # instancias de VistaProductoAgrupado -- solo lee atributos (codigo,
+    # grupo_nombre, descripcion_grupo, familia_nombre, proveedor.marca,
+    # codigo_de_origen, field_id, imagen_url). SimpleNamespace alcanza y
+    # evita inventar una clase de modelo falsa.
+    filas = []
+    for g in page_obj.object_list:
+        grupo_nombre_norm = str(g["grupo_nombre"]).strip().upper() if g["grupo_nombre"] else ""
+        filas.append(SimpleNamespace(
+            field_id=g["id"],
+            codigo=g["codigo"],
+            codigo_de_origen=g["codigo_de_origen"],
+            grupo_nombre=g["grupo_nombre"],
+            familia_nombre=g["familia_nombre"],
+            descripcion_grupo=descripciones_dict.get(grupo_nombre_norm, g["descripcion_grupo_original"] or ""),
+            imagen_url=imagenes_dict.get(grupo_nombre_norm, None),
+            proveedor=SimpleNamespace(marca=g["proveedor_marca"]),
+        ))
+    page_obj.object_list = filas
 
     catalogo_vigente_con_precio = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').filter(is_current=True).first()
     catalogo_vigente_sin_precio = CatalogCache.objects.filter(pdf_file__icontains='Sin_Precio', is_current=True).first()
@@ -638,6 +887,7 @@ def dashboard_productos(request):
             "busqueda": texto_busqueda,
             "query": texto_busqueda,
             "kpi_productos_activos": kpi_productos_activos,
+            "kpi_productos_activos_bruto": kpi_productos_activos_bruto,
             "kpi_familias_activas": kpi_familias_activas,
             "kpi_proveedores": kpi_proveedores,
             "kpi_nuevos_6_meses": kpi_nuevos_6_meses,
@@ -925,6 +1175,13 @@ def generar_pdf(request):
 
         productos_raw = list(qs)
         familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
+        # NOTA (Claude): fichas técnicas de Truper cacheadas por código_de_origen
+        # (ver comando "sync_fichas_truper" y modelo TruperFichaTecnica). No se
+        # consulta a truper.com en vivo durante la generación del PDF.
+        fichas_truper_dict = {
+            item.codigo_origen: item.url_ficha_tecnica
+            for item in TruperFichaTecnica.objects.all()
+        }
         FAMILIAS_EXCLUIDAS = {'70', '90', '95', '98', '99'}
 
         productos = []
@@ -959,6 +1216,8 @@ def generar_pdf(request):
             else:
                 p.medida_mostrar = extraer_medida(p.grupo_final, p.descripcion or "", p.codigo_de_origen or "")
 
+            p.url_ficha_tecnica = fichas_truper_dict.get(p.codigo_de_origen) if p.codigo_de_origen else None
+
             if p.precio_base_pesos:
                 p.precio_clp = f"{int(round(p.precio_base_pesos)):,}".replace(",", ".") + ".-"
             else:
@@ -987,6 +1246,11 @@ def generar_pdf(request):
         ordenes_dict = {
             str(img.grupo_nombre).strip().upper(): img.orden_grupo
             for img in ImagenProducto.objects.all()
+        }
+
+        super_grupos_dict = {
+            str(img.grupo_nombre).strip().upper(): img.super_grupo
+            for img in ImagenProducto.objects.all() if img.super_grupo
         }
 
         catalogo = OrderedDict()
@@ -1081,14 +1345,10 @@ def generar_pdf(request):
                     ]
                     info['marca_grupo'] = Counter(marcas_grupo).most_common(1)[0][0] if marcas_grupo else ""
 
+                    info['super_grupo'] = super_grupos_dict.get(str(nombre_g).strip().upper())
+
                 familias_de_marca[familia] = OrderedDict(
-                    sorted(grupos.items(), key=lambda item: (
-                        item[1]['posicion_fija'],
-                        len(item[1]['variantes']),
-                        item[1]['prefijo_nombre'],
-                        item[1]['min_codigo_prod'],
-                        item[1]['min_codigo_str']
-                    ))
+                    _agrupar_por_super_grupo(list(grupos.items()))
                 )
 
                 SLOTS_POR_FILA = 3
@@ -1397,14 +1657,8 @@ def generar_pdf(request):
             catalogos_existentes = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').order_by('version_number')
             texto_tipo = "con precio (Solo Truper)" if es_solo_truper else "con precio"
 
-        if catalogos_existentes.count() >= 3:
-            catalogo_mas_antiguo = catalogos_existentes.first()
-            if catalogo_mas_antiguo.pdf_file:
-                ruta_fisica = catalogo_mas_antiguo.pdf_file.path
-                catalogo_mas_antiguo.pdf_file.delete(save=False)
-                if os.path.exists(ruta_fisica):
-                    logger.warning(f"[generar_pdf] El archivo {ruta_fisica} no se eliminó del disco (delete silencioso).")
-            catalogo_mas_antiguo.delete()
+        catalogo_eliminado = _eliminar_catalogo_mas_antiguo_si_corresponde(catalogos_existentes)
+        if catalogo_eliminado:
             messages.warning(request, f"Se ha eliminado el catálogo {texto_tipo} más antiguo para liberar espacio.")
 
         limpiar_pdfs_huerfanos(sin_precio)
@@ -1623,6 +1877,13 @@ def _ejecutar_generacion_pdf_en_hilo(job_id, request, grupos_seleccionados, tipo
 
         productos_raw = list(qs)
         familias_dict = {f.codigo: f.descripcion for f in FamiliaProducto.objects.all()}
+        # NOTA (Claude): fichas técnicas de Truper cacheadas por código_de_origen
+        # (ver comando "sync_fichas_truper" y modelo TruperFichaTecnica). No se
+        # consulta a truper.com en vivo durante la generación del PDF.
+        fichas_truper_dict = {
+            item.codigo_origen: item.url_ficha_tecnica
+            for item in TruperFichaTecnica.objects.all()
+        }
         FAMILIAS_EXCLUIDAS = {'70', '90', '95', '98', '99'}
 
         productos = []
@@ -1657,6 +1918,8 @@ def _ejecutar_generacion_pdf_en_hilo(job_id, request, grupos_seleccionados, tipo
             else:
                 p.medida_mostrar = extraer_medida(p.grupo_final, p.descripcion or "", p.codigo_de_origen or "")
 
+            p.url_ficha_tecnica = fichas_truper_dict.get(p.codigo_de_origen) if p.codigo_de_origen else None
+
             if p.precio_base_pesos:
                 p.precio_clp = f"{int(round(p.precio_base_pesos)):,}".replace(",", ".") + ".-"
             else:
@@ -1688,7 +1951,12 @@ def _ejecutar_generacion_pdf_en_hilo(job_id, request, grupos_seleccionados, tipo
             for img in ImagenProducto.objects.all()
         }
 
-        _marcar("Construccion de 4 diccionarios de ImagenProducto (imagenes/descripciones/destacados/ordenes)")
+        super_grupos_dict = {
+            str(img.grupo_nombre).strip().upper(): img.super_grupo
+            for img in ImagenProducto.objects.all() if img.super_grupo
+        }
+
+        _marcar("Construccion de 5 diccionarios de ImagenProducto (imagenes/descripciones/destacados/ordenes/super_grupos)")
         catalogo = OrderedDict()
         catalogo["Truper"] = OrderedDict()
         if not es_solo_truper:
@@ -1782,14 +2050,10 @@ def _ejecutar_generacion_pdf_en_hilo(job_id, request, grupos_seleccionados, tipo
                     ]
                     info['marca_grupo'] = Counter(marcas_grupo).most_common(1)[0][0] if marcas_grupo else ""
 
+                    info['super_grupo'] = super_grupos_dict.get(str(nombre_g).strip().upper())
+
                 familias_de_marca[familia] = OrderedDict(
-                    sorted(grupos.items(), key=lambda item: (
-                        item[1]['posicion_fija'],
-                        len(item[1]['variantes']),
-                        item[1]['prefijo_nombre'],
-                        item[1]['min_codigo_prod'],
-                        item[1]['min_codigo_str']
-                    ))
+                    _agrupar_por_super_grupo(list(grupos.items()))
                 )
 
                 SLOTS_POR_FILA = 3
@@ -2090,14 +2354,7 @@ def _ejecutar_generacion_pdf_en_hilo(job_id, request, grupos_seleccionados, tipo
             nombre_archivo = f"{prefijo_nombre}_{fecha_archivo}.pdf"
             catalogos_existentes = CatalogCache.objects.exclude(pdf_file__icontains='Sin_Precio').order_by('version_number')
 
-        if catalogos_existentes.count() >= 3:
-            catalogo_mas_antiguo = catalogos_existentes.first()
-            if catalogo_mas_antiguo.pdf_file:
-                ruta_fisica = catalogo_mas_antiguo.pdf_file.path
-                catalogo_mas_antiguo.pdf_file.delete(save=False)
-                if os.path.exists(ruta_fisica):
-                    logger.warning(f"[generar_pdf_async] El archivo {ruta_fisica} no se eliminó del disco (delete silencioso).")
-            catalogo_mas_antiguo.delete()
+        _eliminar_catalogo_mas_antiguo_si_corresponde(catalogos_existentes)
 
         limpiar_pdfs_huerfanos(sin_precio)
 
@@ -2196,6 +2453,7 @@ def gestionar_grupos(request):
             nuevo_grp = request.POST.get("nuevo_grupo_individual", "").strip().upper()
             nuevo_subgrupo = request.POST.get("nuevo_subgrupo_individual", "").strip()
             nuevo_limpio = request.POST.get("nuevo_nombre_limpio_individual", "").strip()
+            nuevo_super_grupo = request.POST.get("nuevo_super_grupo_individual", "").strip().upper()
             orden = request.POST.get("orden_grupo_individual", "0").strip()
             es_destacado = request.POST.get("es_destacado_individual") == "1"
             etiqueta = request.POST.get("etiqueta_destacado_individual", "OFERTA").strip()
@@ -2220,6 +2478,7 @@ def gestionar_grupos(request):
                     img_obj.orden_grupo = int(orden) if orden.isdigit() else 0
                     img_obj.es_destacado = es_destacado
                     img_obj.etiqueta_destacado = etiqueta if etiqueta else "OFERTA"
+                    img_obj.super_grupo = nuevo_super_grupo if nuevo_super_grupo else None
                     img_obj.save()
 
                 messages.success(request, f"Producto #{p_id} guardado correctamente.")
@@ -2230,6 +2489,7 @@ def gestionar_grupos(request):
             grupos = request.POST.getlist("nuevo_grupo[]")
             subgrupos = request.POST.getlist("nuevo_subgrupo[]")
             nombres_limpios = request.POST.getlist("nuevo_nombre_limpio[]")
+            super_grupos = request.POST.getlist("nuevo_super_grupo[]")
             ordenes = request.POST.getlist("orden_grupo[]")
             destacados_checks = request.POST.getlist("es_destacado[]")
             etiquetas = request.POST.getlist("etiqueta_destacado[]")
@@ -2242,6 +2502,7 @@ def gestionar_grupos(request):
                 nuevo_grp = grupos[i].strip().upper() if i < len(grupos) else ""
                 nuevo_subgrupo = subgrupos[i].strip() if i < len(subgrupos) else ""
                 nuevo_limpio = nombres_limpios[i].strip() if i < len(nombres_limpios) else ""
+                nuevo_super_grupo_val = super_grupos[i].strip().upper() if i < len(super_grupos) else ""
                 orden_val = ordenes[i].strip() if i < len(ordenes) else "0"
                 etiqueta_val = etiquetas[i].strip() if i < len(etiquetas) else "OFERTA"
                 es_dest = str(p_id) in destacados_checks
@@ -2265,6 +2526,7 @@ def gestionar_grupos(request):
                     img_obj.orden_grupo = int(orden_val) if orden_val.isdigit() else 0
                     img_obj.es_destacado = es_dest
                     img_obj.etiqueta_destacado = etiqueta_val if etiqueta_val else "OFERTA"
+                    img_obj.super_grupo = nuevo_super_grupo_val if nuevo_super_grupo_val else None
                     img_obj.save()
 
             messages.success(request, f"Se han guardado y actualizado los {len(producto_ids)} productos de esta página.")
@@ -2275,10 +2537,16 @@ def gestionar_grupos(request):
             if prod_id_restaurar:
                 ProductoGrupoManual.objects.filter(producto_id=prod_id_restaurar).delete()
             if grupo_restaurar:
+                # NOTA (Claude): agregamos super_grupo=None a este reset porque
+                # es un atributo del mismo tipo que orden_grupo/es_destacado
+                # (metadata del grupo, no del producto individual). Si NO
+                # quieres que "Restaurar" borre el Súper Grupo asignado,
+                # quita esta línea.
                 ImagenProducto.objects.filter(grupo_nombre=grupo_restaurar).update(
                     orden_grupo=0,
                     es_destacado=False,
-                    etiqueta_destacado="OFERTA"
+                    etiqueta_destacado="OFERTA",
+                    super_grupo=None
                 )
             messages.success(request, f"Producto #{prod_id_restaurar} restaurado a sus valores automáticos.")
 
@@ -2328,6 +2596,18 @@ def gestionar_grupos(request):
     grupos_manuales = set(ProductoGrupoManual.objects.values_list("grupo_personalizado", flat=True))
     todos_los_grupos = sorted(list(grupos_sql.union(grupos_manuales)))
 
+    # NOTA (Claude): lista de Súper Grupos ya usados, para el <datalist>
+    # del selector en gestionar_grupos.html. Se guardan en
+    # ImagenProducto.super_grupo (NO en ProductoGrupoManual), así que esto
+    # no toca ninguna agrupación manual existente.
+    todos_los_super_grupos = sorted(
+        set(
+            ImagenProducto.objects.exclude(super_grupo__isnull=True)
+            .exclude(super_grupo__exact="")
+            .values_list("super_grupo", flat=True)
+        )
+    )
+
     paginator = Paginator(productos_qs, 25)
     page = request.GET.get("page")
     page_obj = paginator.get_page(page)
@@ -2353,12 +2633,14 @@ def gestionar_grupos(request):
         p.orden_grupo = meta_grupo.orden_grupo if meta_grupo else 0
         p.es_destacado = meta_grupo.es_destacado if meta_grupo else False
         p.etiqueta_destacado = meta_grupo.etiqueta_destacado if (meta_grupo and meta_grupo.etiqueta_destacado) else "OFERTA"
+        p.super_grupo = meta_grupo.super_grupo if (meta_grupo and meta_grupo.super_grupo) else ""
 
     return render(request, "gestionar_grupos.html", {
         "page_obj": page_obj,
         "productos": page_obj,
         "busqueda": texto_busqueda,
         "todos_los_grupos": todos_los_grupos,
+        "todos_los_super_grupos": todos_los_super_grupos,
     })
 
 # ==========================================

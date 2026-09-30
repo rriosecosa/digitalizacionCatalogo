@@ -86,6 +86,7 @@
   <form id="form-exportar" action="{% url 'iniciar_generacion_pdf' %}" method="POST" target="_blank">
     {% csrf_token %}
     <input type="hidden" name="modo_catalogo" id="input-modo-catalogo" value="truper">
+    <input type="hidden" name="modo_filtro" id="input-modo-filtro" value="solo_truper">
 
     <!-- 1. OPCIONES PRINCIPALES -->
     <div style="margin-bottom: 24px;">
@@ -277,6 +278,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     const botonesModo = document.querySelectorAll(".btn-filtro-tipo");
     const inputModo = document.getElementById("input-modo-catalogo");
+    const inputModoFiltro = document.getElementById("input-modo-filtro");
     const contenedores = document.querySelectorAll(".contenedor-modo");
     const labelEditor = document.getElementById("label-editor-categorias");
     const btnToggleEditor = document.getElementById("btn-toggle-editor");
@@ -306,6 +308,15 @@
 
         const modo = this.getAttribute("data-modo");
         inputModo.value = modo;
+        // NOTA (Claude): este es el campo que la view realmente lee
+        // (request.POST.get('modo_filtro', 'completo')) para decidir si
+        // aplica el filtro extra por prefijo de código (17/18) que blinda
+        // el modo "Solo Truper" -- antes no existía este input y el form
+        // solo mandaba "modo_catalogo", que la view ignora por completo,
+        // así que "modo_filtro" siempre llegaba vacío y el backend
+        // generaba SIEMPRE en modo "completo", sin importar el botón
+        // elegido.
+        inputModoFiltro.value = (modo === "truper") ? "solo_truper" : "completo";
         labelEditor.textContent = titulos[modo];
 
         contenedores.forEach((c) => {

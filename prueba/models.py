@@ -62,7 +62,7 @@ class FamiliaProducto(models.Model):
 
 
 class VistaProductoAgrupado(models.Model):
-    id = models.IntegerField(primary_key=True) 
+    id = models.IntegerField(primary_key=True)
     codigo = models.TextField(blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True)
     precio_base_pesos = models.FloatField(blank=True, null=True)
@@ -97,12 +97,12 @@ class VistaProductoAgrupado(models.Model):
         return FamiliaProducto.objects.filter(codigo=partes[1]).first()
 
     class Meta:
-        managed = False 
+        managed = False
         db_table = "vista_producto_agrupado"
 
 
 class VistaProductoVariantes(models.Model):
-    id = models.IntegerField(primary_key=True) 
+    id = models.IntegerField(primary_key=True)
     codigo = models.TextField(blank=True, null=True)
     codigo_de_origen = models.CharField(max_length=255, null=True, blank=True)
     descripcion = models.TextField(blank=True, null=True)
@@ -110,7 +110,7 @@ class VistaProductoVariantes(models.Model):
     precio_base_pesos = models.FloatField(blank=True, null=True)
     stock_disponible = models.FloatField(blank=True, null=True)
     eliminado = models.FloatField(blank=True, null=True)
-    
+
     proveedor = models.ForeignKey(
         "Proveedor",
         db_column="proveedor_id",
@@ -119,7 +119,7 @@ class VistaProductoVariantes(models.Model):
         null=True,
         related_name="variantes_productos",
     )
-    
+
     unidad_medida = models.TextField(blank=True, null=True)
     familia_nombre = models.CharField(max_length=255, null=True, blank=True)
     empaque_inner = models.CharField(max_length=100, null=True, blank=True)
@@ -148,6 +148,20 @@ class ImagenProducto(models.Model):
     orden_grupo = models.IntegerField(default=0, db_index=True)
     es_destacado = models.BooleanField(default=False, verbose_name="¿Es Destacado / Oferta?")
     etiqueta_destacado = models.CharField(max_length=50, blank=True, null=True, default="OFERTA")
+    # NOTA (Claude): campo nuevo para la funcionalidad de "Súper Grupo".
+    # Se guarda aquí (por nombre de grupo final, manual o automático) y NO
+    # en ProductoGrupoManual, para no tocar en absoluto las agrupaciones
+    # manuales existentes. Sirve para juntar varios grupos relacionados
+    # dentro de una misma familia al generar el PDF (ej. que todos los
+    # "martillos" queden adyacentes), sin perder el orden estético por
+    # cantidad de variantes que ya existía.
+    super_grupo = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        verbose_name="Súper Grupo (agrupa varios grupos dentro de una familia)"
+    )
     creado_el = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -167,7 +181,7 @@ class CatalogCache(models.Model):
 
     def __str__(self):
         return f"Catálogo v{self.version_number} - {'Actual' if self.is_current else 'Anterior'}"
-    
+
 
 class HistorialCatalogo(models.Model):
     nombre = models.CharField(max_length=200, verbose_name="Nombre del Catálogo")
@@ -195,6 +209,9 @@ class HistorialCatalogo(models.Model):
 # una definición tenía `subgrupo_personalizado` y la otra tenía
 # `nombre_limpio_personalizado` + `actualizado_el`. Las fusioné en una
 # sola clase con todos los campos, ya que ambos se usan en views.py.
+# IMPORTANTE: este modelo NO fue tocado para agregar el "Súper Grupo" —
+# ese campo nuevo vive en ImagenProducto, así que las agrupaciones
+# manuales guardadas acá quedan exactamente igual.
 class ProductoGrupoManual(models.Model):
     producto_id = models.IntegerField(unique=True, db_index=True)
     grupo_personalizado = models.CharField(max_length=255)
@@ -225,3 +242,18 @@ class SyncLog(models.Model):
 
     def __str__(self):
         return f"Sync {self.fecha:%Y-%m-%d %H:%M} - {self.estado}"
+
+# =====================================================================
+# CACHE DE FICHAS TÉCNICAS DE TRUPER (hipervínculos del catálogo en PDF)
+# =====================================================================
+class TruperFichaTecnica(models.Model):
+    codigo_origen = models.CharField(max_length=50, unique=True, db_index=True)
+    url_ficha_tecnica = models.URLField(max_length=500)
+    actualizado_el = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ficha Técnica Truper (caché)"
+        verbose_name_plural = "Fichas Técnicas Truper (caché)"
+
+    def __str__(self):
+        return f"{self.codigo_origen} -> {self.url_ficha_tecnica}"

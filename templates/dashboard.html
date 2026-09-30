@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Gestión de Catálogo</title>
+    <title>Panel de Control - Gestión de Catálogo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
 
@@ -24,6 +24,11 @@
         .th-sort-link:hover { color: #2563eb; }
         .th-sort-link i { font-size: 11px; }
         .th-sort-link.activo { color: #2563eb; font-weight: 700; }
+        .kpi-nota {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -114,6 +119,7 @@
         <div class="kpi-card">
             <p class="kpi-title">Productos Activos</p>
             <p class="kpi-value">{{ kpi_productos_activos }}</p>
+            <p class="kpi-nota">{{ kpi_productos_activos_bruto }} SKUs en total (sin agrupar)</p>
         </div>
         <div class="kpi-card">
             <p class="kpi-title">Familias Activas</p>

@@ -48,6 +48,7 @@
             <thead>
                 <tr>
                     <th>Código Interno</th>
+                    <th>Cód. Origen</th>
                     <th>Descripción de Medida</th>
                     <th>Unidad de Medida</th>
 
@@ -58,12 +59,14 @@
                     {% endif %}
 
                     <th>Precio Base</th>
+                    <th>Ficha Técnica</th>
                 </tr>
             </thead>
             <tbody>
                 {% for var in variantes %}
                 <tr>
                     <td><span class="text-mono">{{ var.codigo|default:"---" }}</span></td>
+                    <td><span class="text-mono">{{ var.codigo_de_origen|default:"---" }}</span></td>
                     <td>{{ var.nombre_limpio }}</td>
                     <td>{{ var.unidad_medida|default:"-" }}</td>
 
@@ -81,6 +84,15 @@
                                 <span class="consultar">Consultar precio</span>
                             {% endif %}
                         {% endwith %}
+                    </td>
+                    <td>
+                        {% if var.url_ficha_tecnica %}
+                            <a href="{{ var.url_ficha_tecnica }}" target="_blank" rel="noopener noreferrer">
+                                Ver ficha oficial
+                            </a>
+                        {% else %}
+                            <span class="consultar">-</span>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

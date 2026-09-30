@@ -60,6 +60,32 @@
         .usuario-actual i {
             font-size: 1rem;
         }
+        /* Selector de "productos por página" */
+        .selector-por-pagina {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: #334155;
+            margin: 0 12px;
+        }
+        .selector-por-pagina label {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .selector-por-pagina select {
+            padding: 5px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #334155;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .barra-resultados {
+            flex-wrap: wrap;
+            row-gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -121,6 +147,9 @@
                     {% if marca_actual %}
                         <input type="hidden" name="marca" value="{{ marca_actual }}">
                     {% endif %}
+                    {% if por_pagina_actual %}
+                        <input type="hidden" name="por_pagina" value="{{ por_pagina_actual }}">
+                    {% endif %}
                     <input
                         type="text"
                         name="q"
@@ -139,7 +168,7 @@
                 <ul class="lista-opciones">
                     {% for familia in familias %}
                         <li>
-                            <a href="?familia={{ familia.codigo }}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}" class="{% if familia_actual == familia.codigo %}activa{% endif %}">
+                            <a href="?familia={{ familia.codigo }}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}" class="{% if familia_actual == familia.codigo %}activa{% endif %}">
                                 <span>{{ familia.descripcion }}</span>
                                 <span class="badge">{{ familia.total }}</span>
                             </a>
@@ -149,7 +178,7 @@
                     {% endfor %}
                 </ul>
                 {% if familia_actual %}
-                    <a class="limpiar-filtro" href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de familia</a>
+                    <a class="limpiar-filtro" href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">Quitar filtro de familia</a>
                 {% endif %}
             </details>
 
@@ -158,7 +187,7 @@
                 <ul class="lista-opciones">
                     {% for marca in marcas %}
                         <li>
-                            <a href="?marca={{ marca.nombre }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}" class="{% if marca_actual == marca.nombre %}activa{% endif %}">
+                            <a href="?marca={{ marca.nombre }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}" class="{% if marca_actual == marca.nombre %}activa{% endif %}">
                                 <span>{{ marca.nombre }}</span>
                                 <span class="badge">{{ marca.total }}</span>
                             </a>
@@ -168,7 +197,7 @@
                     {% endfor %}
                 </ul>
                 {% if marca_actual %}
-                    <a class="limpiar-filtro" href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">Quitar filtro de proveedor</a>
+                    <a class="limpiar-filtro" href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">Quitar filtro de proveedor</a>
                 {% endif %}
             </details>
 
@@ -188,23 +217,36 @@
                     {% endif %}
                 </div>
 
+                <form method="get" action="" class="selector-por-pagina" id="formPorPagina">
+                    {% if familia_actual %}<input type="hidden" name="familia" value="{{ familia_actual }}">{% endif %}
+                    {% if marca_actual %}<input type="hidden" name="marca" value="{{ marca_actual }}">{% endif %}
+                    {% if busqueda %}<input type="hidden" name="q" value="{{ busqueda }}">{% endif %}
+                    <label for="selectPorPagina">Mostrar</label>
+                    <select name="por_pagina" id="selectPorPagina" onchange="document.getElementById('formPorPagina').submit()">
+                        {% for opcion in opciones_por_pagina %}
+                            <option value="{{ opcion }}" {% if opcion == por_pagina_actual %}selected{% endif %}>{{ opcion }}</option>
+                        {% endfor %}
+                    </select>
+                    <span>por página</span>
+                </form>
+
                 <div class="chips-activos">
                     {% if busqueda %}
                         <div class="chip">
                             "{{ busqueda }}"
-                            <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}">✕</a>
+                            <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">✕</a>
                         </div>
                     {% endif %}
                     {% if marca_actual %}
                         <div class="chip">
                             Proveedor: {{ marca_actual }}
-                            <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
+                            <a href="?{% if familia_actual %}familia={{ familia_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">✕</a>
                         </div>
                     {% endif %}
                     {% if familia_actual %}
                         <div class="chip">
                             Familia: {{ familia_actual }}
-                            <a href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">✕</a>
+                            <a href="?{% if marca_actual %}marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">✕</a>
                         </div>
                     {% endif %}
                 </div>
@@ -310,21 +352,21 @@
                 <nav class="paginacion">
 
                     {% if page_obj.has_previous %}
-                        <a href="?page={{ page_obj.previous_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">‹</a>
+                        <a href="?page={{ page_obj.previous_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">‹</a>
                     {% endif %}
 
                     {% for numero in page_obj.paginator.page_range %}
                         {% if numero == page_obj.number %}
                             <span class="actual">{{ numero }}</span>
                         {% elif numero == 1 or numero == page_obj.paginator.num_pages or numero|add:"-1" == page_obj.number or numero|add:"1" == page_obj.number %}
-                            <a href="?page={{ numero }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">{{ numero }}</a>
+                            <a href="?page={{ numero }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">{{ numero }}</a>
                         {% elif numero == 2 or numero == page_obj.paginator.num_pages|add:"-1" %}
                             <span class="puntos">…</span>
                         {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}">›</a>
+                        <a href="?page={{ page_obj.next_page_number }}{% if familia_actual %}&familia={{ familia_actual }}{% endif %}{% if marca_actual %}&marca={{ marca_actual }}{% endif %}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if por_pagina_actual %}&por_pagina={{ por_pagina_actual }}{% endif %}">›</a>
                     {% endif %}
 
                 </nav>
